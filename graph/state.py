@@ -11,6 +11,7 @@ class GraphState(TypedDict):
     url: str
     documents: List[Document]
     script: str
+    is_acceptable: bool
     script_evaluation: str
     generation_count: int
     max_generations: int
