@@ -9,6 +9,7 @@ class GraphState(TypedDict):
     param TypedDict: Description
     """
     url: str
+    query: str
     documents: List[Document]
     script: str
     is_acceptable: bool
