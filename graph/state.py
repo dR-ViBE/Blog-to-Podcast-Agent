@@ -14,6 +14,7 @@ class GraphState(TypedDict):
     script: str
     is_acceptable: bool
     script_evaluation: str
+    improvement_suggestions:str
     generation_count: int
     max_generations: int
     audio_output: str

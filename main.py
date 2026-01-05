@@ -1,8 +1,9 @@
+import os  # Optional, just for debugging
 from dotenv import load_dotenv
 load_dotenv()
-from graph.graph import app
 from langchain_core.documents import Document
-import os  # Optional, just for debugging
+from graph.graph import app
+
 
 
 
@@ -16,11 +17,10 @@ if __name__ == "__main__":
     print("--- 🚀 STARTING AGENT RUNTIME DRIVER ---")
 
     initial_state = {
-    "query": "Nutrition and mental health",
-    "generation_count": 0,
-    "max_generations": 3,
-}
-
+        "query": "Prompt Engineering",
+        "generation_count": 0,
+        "max_generations": 3,
+    }
 
     final_state = app.invoke(initial_state)
 
