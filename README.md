@@ -36,7 +36,6 @@ This project intentionally applies multiple modern agent patterns:
 ## 🏗️ Agent Architecture
 
 This project uses a cyclic graph to ensure high-quality script generation.
-
 ```mermaid
 graph TD
     Start([Start]) --> Ingest[Ingest & Embed Blog]
