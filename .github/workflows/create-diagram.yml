@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   get_data:
     runs-on: ubuntu-latest
@@ -18,3 +21,18 @@ jobs:
           # This excludes the heavy local database and environment files
           excluded_paths: "ignore,.github,.chroma,.env,Podcast_Agent/outputs"
           output_file: "diagram.svg"
+
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push diagram
+        run: |
+          if git diff --quiet diagram.svg; then
+            echo "No changes to diagram"
+          else
+            git add diagram.svg
+            git commit -m "chore: update repo diagram"
+            git push
+          fi
