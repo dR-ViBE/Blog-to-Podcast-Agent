@@ -6,7 +6,7 @@
 
 **Blog-to-Podcast Agent** is an intelligent workflow that converts technical blog posts into engaging audio podcasts. 
 
-Unlike simple text-to-speech tools, this project uses an **agentic workflow (LangGraph)** to ingest content, generate a conversational script, grade the quality of the script, and iteratively improve it before generating the final audio using **ElevenLabs**.
+This project uses an **agentic workflow (LangGraph)** to ingest content, generate a conversational script, grade the quality of the script, and iteratively improve it before generating the final audio using **ElevenLabs**.
 
 ---
 
@@ -24,10 +24,5 @@ graph TD
     Grade -->|Needs Improvement| Suggest[Suggest Improvements]
     Suggest --> GenScript
     
-    Grade -->|Approved| GenAudio[Generate Audio (ElevenLabs)]
+    Grade -->|Approved| GenAudio[Generate Audio]
     GenAudio --> End([End])
-    
-    style Start fill:#f9f,stroke:#333
-    style GenScript fill:#bbf,stroke:#333
-    style Grade fill:#ff9,stroke:#333
-    style GenAudio fill:#9f9,stroke:#333
