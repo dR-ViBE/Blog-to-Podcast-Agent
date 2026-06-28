@@ -1,0 +1,78 @@
+# ─── Dockerfile.api ────────────────────────────────────────────────────────
+#
+# Builds the FastAPI backend container.
+#
+# Base image: python:3.11-slim
+#   - Matches the Python version in pyproject.toml (>=3.11)
+#   - "slim" removes unnecessary OS packages for a smaller image (~40% lighter)
+#
+# Layer ordering strategy:
+#   Docker caches each layer. By copying pyproject.toml and poetry.lock FIRST
+#   and installing dependencies BEFORE copying source code, we ensure that
+#   `docker compose build` only re-installs packages when dependencies actually
+#   change — not every time you edit a .py file.
+
+FROM python:3.11-slim
+
+# ── System dependencies ─────────────────────────────────────────────────────
+# curl  : used by the healthcheck and the Ollama wait script
+# gcc   : required to compile some Python C-extension packages (e.g. chromadb)
+# We clean up the apt cache immediately to keep the image layer small.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        gcc \
+        g++ \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Poetry installation ─────────────────────────────────────────────────────
+# We install Poetry into the system pip (not a venv) because this is a
+# container — isolation is already provided by Docker itself.
+# Pinning the version avoids surprise breakage from upstream Poetry releases.
+ENV POETRY_VERSION=2.1.3
+RUN pip install --no-cache-dir "poetry==${POETRY_VERSION}"
+
+# ── Poetry configuration ────────────────────────────────────────────────────
+# virtualenvs.create false  → install packages into the system Python directly
+#                             (no nested virtualenv inside the container)
+# cache-dir                 → put Poetry cache in /tmp so it isn't baked
+#                             into the image layer
+RUN poetry config virtualenvs.create false \
+    && poetry config cache-dir /tmp/poetry-cache
+
+# ── Set working directory ───────────────────────────────────────────────────
+WORKDIR /app
+
+# ── Install Python dependencies (cached layer) ──────────────────────────────
+# Copy ONLY the dependency files first so this expensive layer is cached
+# and only re-runs when pyproject.toml or poetry.lock actually changes.
+COPY pyproject.toml poetry.lock ./
+RUN poetry install --no-interaction --no-ansi --no-root \
+    && rm -rf /tmp/poetry-cache
+
+# ── Copy application source code ────────────────────────────────────────────
+# Copying source code happens AFTER dependency installation so that changing
+# a .py file doesn't invalidate the dependency cache layer above.
+COPY . .
+
+# ── Create required directories ─────────────────────────────────────────────
+# Ensure .chroma and outputs/audio exist even on a fresh clone with no data.
+# In docker-compose these are overridden by bind mounts from the host.
+RUN mkdir -p .chroma outputs/audio
+
+# ── Expose the FastAPI port ─────────────────────────────────────────────────
+EXPOSE 8000
+
+# ── Copy and set the entrypoint script ─────────────────────────────────────
+# The entrypoint script waits for Ollama to have the embedding model ready
+# before starting FastAPI, preventing startup errors on first boot.
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+
+# Default command: start uvicorn with hot-reload enabled
+# --host 0.0.0.0  → listen on all interfaces (required inside Docker)
+# --reload        → restart server when source files change (development mode)
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

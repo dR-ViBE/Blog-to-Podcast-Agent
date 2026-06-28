@@ -12,12 +12,23 @@
 
 import logging
 import logging.config
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# langsmith is imported here only for the startup health check.
+# It does NOT need to be called explicitly anywhere else —
+# setting LANGCHAIN_TRACING_V2=true in .env is all that is required
+# for automatic tracing of LangChain and LangGraph calls.
+try:
+    from langsmith import Client as LangSmithClient
+    _LANGSMITH_AVAILABLE = True
+except ImportError:
+    _LANGSMITH_AVAILABLE = False
 
 from api.routes import router
 
@@ -101,6 +112,43 @@ async def lifespan(app: FastAPI):
     audio_dir = Path("outputs/audio")
     audio_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Audio output directory ready | path=%s", audio_dir.resolve())
+
+    # ── LangSmith startup verification ──────────────────────────────────────
+    # We check at startup whether tracing is configured correctly so that
+    # any misconfiguration is caught immediately (not silently on first request).
+    tracing_enabled = os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true"
+    langsmith_key_set = bool(os.getenv("LANGCHAIN_API_KEY"))
+    langsmith_project = os.getenv("LANGCHAIN_PROJECT", "(not set)")
+
+    if tracing_enabled and langsmith_key_set:
+        logger.info(
+            "LangSmith tracing ENABLED | project=%s | endpoint=%s",
+            langsmith_project,
+            os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com"),
+        )
+        # Optionally verify the API key by listing projects (catches bad keys early)
+        if _LANGSMITH_AVAILABLE:
+            try:
+                client = LangSmithClient()
+                # list_projects() makes a lightweight API call to verify credentials
+                _ = list(client.list_projects())
+                logger.info("LangSmith credentials verified successfully.")
+            except Exception as exc:
+                # Don't crash the server — just warn the operator
+                logger.warning(
+                    "LangSmith credential check failed (tracing may not work): %s", exc
+                )
+    elif tracing_enabled and not langsmith_key_set:
+        logger.warning(
+            "LANGCHAIN_TRACING_V2=true but LANGCHAIN_API_KEY is not set. "
+            "Tracing will be silently disabled by LangChain."
+        )
+    else:
+        logger.info(
+            "LangSmith tracing DISABLED. Set LANGCHAIN_TRACING_V2=true in .env to enable."
+        )
+    # ── End LangSmith startup check ─────────────────────────────────────────
+
     logger.info("Blog-to-Podcast API is ready to accept requests.")
 
     yield  # Application runs here

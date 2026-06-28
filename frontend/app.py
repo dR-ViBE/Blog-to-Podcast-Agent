@@ -10,10 +10,21 @@
 #
 # This app ONLY talks to the FastAPI backend — it never calls LangGraph directly.
 
+import os
 import streamlit as st
 
 # Import our API helper functions from utils.py
 from utils import make_podcast_request, fetch_audio_bytes, check_api_health
+
+# ---------------------------------------------------------------------------
+# ENVIRONMENT CONFIGURATION
+#
+# When running locally:  API_BASE_URL is not set, so we default to localhost.
+# When running in Docker: docker-compose.yml sets API_BASE_URL=http://api:8000
+#   so the Streamlit server (running inside Docker) can reach the FastAPI
+#   service via Docker's internal network using the service name "api".
+# ---------------------------------------------------------------------------
+_DEFAULT_API_URL: str = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 
 # ---------------------------------------------------------------------------
@@ -180,9 +191,13 @@ def render_sidebar() -> tuple[str, int]:
         st.markdown("**🔗 API Base URL**")
         api_base_url = st.text_input(
             label="API Base URL",              # Accessibility label (hidden visually)
-            value="http://127.0.0.1:8000",
+            value=_DEFAULT_API_URL,            # Set by API_BASE_URL env var (Docker)
             label_visibility="collapsed",      # Hide label — we show our own above
-            help="The URL where your FastAPI backend is running.",
+            help=(
+                "The URL where your FastAPI backend is running. "
+                "In Docker this is set automatically via the API_BASE_URL "
+                "environment variable in docker-compose.yml."
+            ),
             key="api_url_input",
         )
 

@@ -1,0 +1,62 @@
+# ─── Dockerfile.frontend ───────────────────────────────────────────────────
+#
+# Builds the Streamlit frontend container.
+#
+# WHY THIS IS SEPARATE FROM Dockerfile.api:
+#   The Streamlit app only needs two packages: streamlit and requests.
+#   It does NOT import LangGraph, LangChain, Groq, ChromaDB, or ElevenLabs.
+#   Installing all 50+ packages from pyproject.toml would make this image
+#   ~1.5GB. A minimal pip install keeps it under 400MB.
+#
+# WHY python:3.11-slim:
+#   Matches the project's Python version requirement and is a minimal base.
+
+FROM python:3.11-slim
+
+# ── System dependencies ─────────────────────────────────────────────────────
+# No build tools needed — streamlit and requests are pure Python wheels.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Install only the frontend dependencies ───────────────────────────────────
+# We pin the exact versions from pyproject.toml for reproducibility.
+# This layer is cached unless these version pins change.
+RUN pip install --no-cache-dir \
+    "streamlit>=1.58.0,<2.0.0" \
+    "requests>=2.34.2,<3.0.0"
+
+# ── Set working directory ────────────────────────────────────────────────────
+# We set the working directory to /app/frontend so that Streamlit's
+# `from utils import ...` import in app.py resolves correctly (it looks
+# for utils.py in the same directory as app.py).
+WORKDIR /app/frontend
+
+# ── Copy only the frontend source files ─────────────────────────────────────
+# We copy just the frontend/ directory contents — not the entire project.
+# This means LangGraph source code is never sent to the frontend container.
+COPY frontend/ .
+
+# ── Expose Streamlit's default port ─────────────────────────────────────────
+EXPOSE 8501
+
+# ── Healthcheck ──────────────────────────────────────────────────────────────
+# Docker uses this to determine if the container is healthy.
+# Streamlit exposes a /_stcore/health endpoint.
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
+    CMD curl -sf http://localhost:8501/_stcore/health || exit 1
+
+# ── Start Streamlit ──────────────────────────────────────────────────────────
+# --server.address=0.0.0.0       : Listen on all interfaces (required in Docker)
+# --server.port=8501             : Match the exposed port
+# --server.headless=true         : Disable the browser auto-open (no browser in container)
+# --server.fileWatcherType=poll  : Use polling for file watching in Docker volumes
+#                                  (inotify doesn't work reliably across bind mounts)
+CMD [ \
+    "streamlit", "run", "app.py", \
+    "--server.address=0.0.0.0", \
+    "--server.port=8501", \
+    "--server.headless=true", \
+    "--server.fileWatcherType=poll" \
+]

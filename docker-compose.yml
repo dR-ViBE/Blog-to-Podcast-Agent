@@ -1,0 +1,191 @@
+# docker-compose.yml
+#
+# Defines the full Blog-to-Podcast Agent application stack.
+#
+# SERVICES (in startup order):
+#   1. ollama         — Ollama LLM/embedding server (always-running)
+#   2. ollama-pull    — One-time init: downloads the nomic-embed-text model
+#   3. api            — FastAPI backend (starts after model is ready)
+#   4. frontend       — Streamlit UI (starts after API is healthy)
+#
+# VOLUMES:
+#   ollama_data  (named)  — Ollama model weights; persists between restarts
+#   .chroma      (bind)   — ChromaDB vector data; mapped from host directory
+#   outputs      (bind)   — Generated MP3 audio files; mapped from host directory
+#
+# NETWORKING:
+#   All services share the `podcast_network` bridge network.
+#   Services address each other by service name (e.g. http://api:8000).
+#   Only ports explicitly listed under `ports:` are accessible from the host.
+
+services:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # OLLAMA — Local embedding model server
+  # ─────────────────────────────────────────────────────────────────────────
+  # WHY OLLAMA IS IN DOCKER-COMPOSE:
+  #   The FastAPI backend uses OllamaEmbeddings(model="nomic-embed-text") to
+  #   embed queries and retrieve chunks from ChromaDB. Inside Docker the API
+  #   container cannot reach `localhost:11434` on the host, so we run Ollama
+  #   as a sibling service on the same Docker network.
+  #
+  # The API container connects to Ollama via OLLAMA_HOST=http://ollama:11434.
+  # The langchain-ollama package (and the underlying ollama Python client)
+  # reads the OLLAMA_HOST environment variable automatically.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: podcast_ollama
+    ports:
+      # Expose 11434 to the host so you can also run `ollama list` locally
+      # against the container: OLLAMA_HOST=http://localhost:11434 ollama list
+      - "11434:11434"
+    volumes:
+      # Named volume: stores downloaded model weights.
+      # Without this, every `docker compose up` re-downloads the ~270MB model.
+      - ollama_data:/root/.ollama
+    networks:
+      - podcast_network
+    healthcheck:
+      # The /api/tags endpoint lists available models. It returns 200 once
+      # Ollama is fully initialised. We use this to gate dependent services.
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s  # Give Ollama time to boot before first health check
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # OLLAMA-PULL — One-time model download (runs once then exits)
+  # ─────────────────────────────────────────────────────────────────────────
+  # WHY A SEPARATE SERVICE:
+  #   Ollama does not auto-download models on first use — you must explicitly
+  #   `ollama pull`. We use the ollama image itself (which includes the CLI)
+  #   to run a one-shot pull. `restart: "no"` means it runs once and exits.
+  #
+  #   docker-compose `service_completed_successfully` condition ensures the
+  #   API only starts AFTER this pull has finished. This prevents startup
+  #   errors when the nomic-embed-text model isn't cached yet.
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: podcast_ollama_pull
+    depends_on:
+      ollama:
+        condition: service_healthy  # Only run after ollama server is ready
+    environment:
+      # Tell the ollama CLI to connect to our sibling service, not localhost
+      - OLLAMA_HOST=http://ollama:11434
+    # Pull nomic-embed-text (the embedding model used by retrieve_blog_chunks.py)
+    # If the model is already in the named volume, `pull` is near-instant.
+    entrypoint: ["ollama", "pull", "nomic-embed-text"]
+    networks:
+      - podcast_network
+    restart: "no"  # Run once and exit — do NOT restart on failure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # API — FastAPI backend
+  # ─────────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .                  # Build context is the project root
+      dockerfile: Dockerfile.api
+    container_name: podcast_api
+    ports:
+      - "8000:8000"
+    env_file:
+      # Load all keys from .env (GROQ_API_KEY, LANGCHAIN_API_KEY, etc.)
+      # Variables set under `environment:` below OVERRIDE .env values.
+      - .env
+    environment:
+      # ── Ollama (CRITICAL) ────────────────────────────────────────────────
+      # Override the default localhost:11434 so the API reaches the ollama
+      # Docker service. The ollama Python client reads OLLAMA_HOST automatically.
+      - OLLAMA_HOST=http://ollama:11434
+
+      # ── Application metadata (used by services.py for LangSmith traces) ──
+      - APP_NAME=blog-to-podcast-agent
+      - APP_VERSION=1.0.0
+      - ENVIRONMENT=development
+    volumes:
+      # ── ChromaDB persistence ─────────────────────────────────────────────
+      # Bind-mount the host's .chroma directory into the container at the same
+      # relative path the code uses (./.chroma). This means:
+      #   • Data ingested by `python ingestion.py` on the host is visible inside Docker.
+      #   • Data ingested inside the container persists on the host after restart.
+      - ./.chroma:/app/.chroma
+
+      # ── Audio output persistence ─────────────────────────────────────────
+      # Generated MP3 files are served via GET /audio/{filename}.
+      # Mounting this directory means audio files persist across restarts
+      # and are readable from the host for inspection.
+      - ./outputs:/app/outputs
+
+      # ── Hot reload: source code bind mounts ──────────────────────────────
+      # Mount source directories so uvicorn --reload picks up file changes
+      # without rebuilding the image. Great for development.
+      # Remove these volume entries for a production deployment.
+      - ./api:/app/api
+      - ./graph:/app/graph
+      - ./main.py:/app/main.py
+      - ./.env:/app/.env
+    depends_on:
+      ollama-pull:
+        # Only start after the model pull service has successfully completed.
+        # This guarantees nomic-embed-text is available before the first request.
+        condition: service_completed_successfully
+    networks:
+      - podcast_network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # FRONTEND — Streamlit UI
+  # ─────────────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .                       # Build context is the project root
+      dockerfile: Dockerfile.frontend
+    container_name: podcast_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      # ── API URL (CRITICAL) ───────────────────────────────────────────────
+      # Inside Docker, the Streamlit Python process communicates with FastAPI
+      # via Docker's internal network using the service name "api".
+      # This value is read by frontend/app.py to set the default API URL.
+      - API_BASE_URL=http://api:8000
+    volumes:
+      # Hot reload: mount frontend source so Streamlit picks up .py changes
+      - ./frontend:/app/frontend
+    depends_on:
+      api:
+        condition: service_healthy  # Only start after FastAPI is healthy
+    networks:
+      - podcast_network
+    restart: unless-stopped
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VOLUMES
+# ─────────────────────────────────────────────────────────────────────────────
+volumes:
+  ollama_data:
+    # Named volume managed by Docker.
+    # Stores Ollama model weights (~270MB for nomic-embed-text).
+    # Persists between `docker compose down` and `docker compose up`.
+    # To force a fresh model download: `docker volume rm podcast_agent_ollama_data`
+    name: podcast_agent_ollama_data
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NETWORKS
+# ─────────────────────────────────────────────────────────────────────────────
+networks:
+  podcast_network:
+    # Bridge network: all services can reach each other by service name.
+    # Services are isolated from other Docker networks on the host.
+    driver: bridge
+    name: podcast_agent_network

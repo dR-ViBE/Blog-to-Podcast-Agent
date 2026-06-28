@@ -1,0 +1,81 @@
+# .dockerignore
+#
+# Tells Docker which files to EXCLUDE from the build context.
+#
+# WHY THIS MATTERS:
+#   When you run `docker compose build`, Docker sends the entire build context
+#   (the project directory) to the Docker daemon. Without .dockerignore, it
+#   would send the .venv (can be 1GB+), .git history, .chroma data, etc.
+#   This would make every build slow and the images unnecessarily large.
+#
+#   By ignoring these paths, the build context is kept small, builds are fast,
+#   and sensitive files like .env never get baked into the image layer.
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+# The .venv is for local development. Inside Docker, Poetry installs packages
+# directly into the system Python (virtualenvs.create = false).
+.venv/
+venv/
+env/
+
+# ── Python cache files ────────────────────────────────────────────────────────
+# These are regenerated at runtime and should never be in an image.
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*$py.class
+
+# ── Git history ───────────────────────────────────────────────────────────────
+# Git metadata has no place in a runtime container.
+.git/
+.gitignore
+.github/
+
+# ── Environment file ─────────────────────────────────────────────────────────
+# IMPORTANT: Never bake .env into a Docker image!
+# API keys baked into images can leak if the image is pushed to a registry.
+# We pass .env via `env_file:` in docker-compose.yml instead.
+.env
+.env.*
+
+# ── ChromaDB data ─────────────────────────────────────────────────────────────
+# The .chroma directory is mounted as a bind volume in docker-compose.yml.
+# We don't need it in the image — it's mapped from the host at runtime.
+.chroma/
+
+# ── Generated audio output ────────────────────────────────────────────────────
+# Same as .chroma — mounted as a volume, not baked into the image.
+outputs/
+
+# ── IDE and OS files ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+# ── Poetry cache ──────────────────────────────────────────────────────────────
+# Local Poetry cache from development — not needed in the container.
+.cache/
+
+# ── Test and coverage artifacts ───────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+.tox/
+*.cover
+
+# ── Documentation ─────────────────────────────────────────────────────────────
+docs/
+*.md
+!README.md
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+
+# ── Docker files themselves ───────────────────────────────────────────────────
+# No need to copy Dockerfiles into the running container.
+Dockerfile*
+docker-compose*.yml
+docker-entrypoint.sh
