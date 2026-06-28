@@ -48,7 +48,7 @@ WORKDIR /app
 # Copy ONLY the dependency files first so this expensive layer is cached
 # and only re-runs when pyproject.toml or poetry.lock actually changes.
 COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-interaction --no-ansi --no-root \
+RUN poetry install --no-interaction --no-ansi --no-root --without dev \
     && rm -rf /tmp/poetry-cache
 
 # ── Copy application source code ────────────────────────────────────────────

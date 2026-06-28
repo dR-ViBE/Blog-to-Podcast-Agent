@@ -75,7 +75,15 @@ docs/
 *.log
 
 # ── Docker files themselves ───────────────────────────────────────────────────
-# No need to copy Dockerfiles into the running container.
+# Dockerfiles and docker-compose configs have no place in the running container.
+# NOTE: docker-entrypoint.sh is intentionally NOT excluded — Dockerfile.api
+#       COPYs it into the image as the container ENTRYPOINT script.
 Dockerfile*
 docker-compose*.yml
-docker-entrypoint.sh
+
+# ── Test suite ────────────────────────────────────────────────────────────────
+# Tests run in CI, not inside the production container.
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
