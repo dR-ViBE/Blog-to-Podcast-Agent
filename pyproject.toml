@@ -20,7 +20,12 @@ dependencies = [
     "langsmith (>=0.5.2,<0.6.0)",
     "python-dotenv (>=1.2.1,<2.0.0)",
     "langchain-tavily (>=0.2.16,<0.3.0)",
-    "beautifulsoup4 (>=4.14.3,<5.0.0)"
+    "beautifulsoup4 (>=4.14.3,<5.0.0)",
+    "fastapi (>=0.138.1,<0.139.0)",
+    "uvicorn[standard] (>=0.49.0,<0.50.0)",
+    "python-multipart (>=0.0.32,<0.0.33)",
+    "streamlit (>=1.58.0,<2.0.0)",
+    "requests (>=2.34.2,<3.0.0)"
 ]
 
 
