@@ -9,3 +9,5 @@ GENERATE_AUDIO = "generate_audio"
 ACCEPT = "accept"
 
 REGENERATE = "regenerate"
+
+SUGGEST_IMPROVEMENTS = "suggest_improvements"

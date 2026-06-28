@@ -117,3 +117,6 @@ venv.bak/
 
 # Windows
 Thumbs.db
+
+#audio files
+outputs/audio/*.mp3

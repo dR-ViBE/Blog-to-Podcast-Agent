@@ -16,6 +16,9 @@ INSTRUCTIONS:
 4.  **Formatting for Audio:** * Write in clean, speakable paragraphs. 
     * **DO NOT** use headers, markdown titles, or speaker labels (like "Host:"). 
     * **DO NOT** include non-verbal cues (like *[laughs]* or *[music fades]*).
+    **Handle Technical Content:** * If the blog has math symbols (like $s \in \mathcal$) or code, **DO NOT READ THEM VERBATIM.**
+    * Instead, explain the *concept* in plain English (e.g., say "variables representing states" instead of "s in mathcal S").
+    * Skip dense tables or code blocks; just summarize their purpose.
     * Just provide the raw spoken text.
 5.  **Structure:**
     * **Intro:** Start with a catchy hook, welcome the listeners ("loopers"), and introduce the topic.

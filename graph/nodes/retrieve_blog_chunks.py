@@ -8,6 +8,9 @@ from langchain_core.documents import Document
 def retrieve_blog_chunks(state: GraphState) -> Dict:
     query = state.get("query", "")
 
+    if not query:
+        raise ValueError("retrieve_blog_chunks requires 'query' in state")
+
     vectorstore = Chroma(collection_name="blog_podcast_agent",
                          embedding_function=OllamaEmbeddings(
                              model="nomic-embed-text"),

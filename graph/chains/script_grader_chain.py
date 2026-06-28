@@ -9,9 +9,9 @@ llm = ChatGroq(model="llama-3.1-8b-instant")
 class GradeScript(BaseModel):
     """Binary score for the generated script is acceptable or not,Reason why it is not acceptable"""
     is_acceptable: bool = Field(
-        description="script meets said podcast quality conditions,'true' or 'false'")
+        description="Boolean.Script meets said podcast quality conditions,'true' or 'false'")
     reason: str = Field(
-        description="Give clear ,concise reason why the script is not acceptable")
+        description="String. A concise explanation of why is_acceptable is True or False.")
 
 
 structured_llm_grader = llm.with_structured_output(GradeScript)
@@ -39,7 +39,7 @@ Your job is to quality-control a monologue script generated for the "The Insight
     * Must be engaging, infotainment style (not a boring lecture).
 
 **OUTPUT INSTRUCTION:**
-Return a JSON object with `is_acceptable` (boolean) and `reason` (string).
+If the script violates ANY of these, set 'is_acceptable'(boolean) to False and 'reason'(string) explain why.
 """
 
 grader_prompt = ChatPromptTemplate.from_messages(

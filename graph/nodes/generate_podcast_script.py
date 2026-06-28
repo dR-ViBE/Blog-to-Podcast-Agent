@@ -18,8 +18,15 @@ def generate_podcast_script(state: GraphState) -> Dict:
     # Read and increment generation count
     generation_count = state.get("generation_count", 0) + 1
 
+    improvement_suggestions = state.get("improvement_suggestions", "")
+
     # Generate podcast script
-    script = script_generation_chain.invoke({"context": context})
+
+    generation_input = {
+        "context": context,
+        "improvement_suggestions": improvement_suggestions,
+    }
+    script = script_generation_chain.invoke(generation_input)
 
     # Return only updated fields (partial state)
     return {

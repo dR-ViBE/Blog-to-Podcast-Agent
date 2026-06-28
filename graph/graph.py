@@ -1,34 +1,37 @@
 from langgraph.graph import END, StateGraph
 from graph.state import GraphState
-from graph.consts import GENERATE_SCRIPT, GRADE_SCRIPT, GENERATE_AUDIO,RETRIEVE
+from graph.consts import GENERATE_SCRIPT, GRADE_SCRIPT, GENERATE_AUDIO, RETRIEVE, SUGGEST_IMPROVEMENTS
 # ACCEPT, REGENERATE,RETRIEVE,
 from graph.nodes import generate_audio, grade_script, generate_podcast_script
 # from graph.chains import podcast_script_chain, script_grader_chain
 from graph.conditionals import decide_next_step
-from graph.nodes import retrieve_blog_chunks
+from graph.nodes import retrieve_blog_chunks, suggest_imporvements
 
 
-#Create state Graph
+# Create state Graph
 workflow = StateGraph(GraphState)
 
-#Creating the nodes
+# Creating the nodes
 workflow.add_node(GENERATE_AUDIO, generate_audio)
 workflow.add_node(GENERATE_SCRIPT, generate_podcast_script)
-workflow.add_node(RETRIEVE,retrieve_blog_chunks)
+workflow.add_node(RETRIEVE, retrieve_blog_chunks)
 workflow.add_node(GRADE_SCRIPT, grade_script)
+workflow.add_node(SUGGEST_IMPROVEMENTS, suggest_imporvements)
 workflow.add_edge(RETRIEVE, GENERATE_SCRIPT)
 
 workflow.add_edge(GENERATE_SCRIPT, GRADE_SCRIPT)
 
-#Starting point of the graph
+workflow.add_edge(SUGGEST_IMPROVEMENTS,GENERATE_SCRIPT)
+
+# Starting point of the graph
 workflow.set_entry_point(RETRIEVE)
 
-#Conditional edge
+# Conditional edge
 workflow.add_conditional_edges(GRADE_SCRIPT, decide_next_step, {
-                               GENERATE_AUDIO: GENERATE_AUDIO, GENERATE_SCRIPT: GENERATE_SCRIPT, END: END})
+                               GENERATE_AUDIO: GENERATE_AUDIO, SUGGEST_IMPROVEMENTS: SUGGEST_IMPROVEMENTS, END: END})
 
-#Endpoint
+# Endpoint
 workflow.add_edge(GENERATE_AUDIO, END)
 
-#Ready to execute
-app=workflow.compile()
+# Ready to execute
+app = workflow.compile()
