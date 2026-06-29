@@ -92,6 +92,9 @@ def run_podcast_agent(query: str, max_generations: int = 3) -> PodcastResponse:
         run_podcast_agent                       ← @traceable (this function)
         └── Blog-to-Podcast Pipeline            ← LangGraph graph run
             ├── retrieve                        ← LangGraph node
+            ├── plan_episode                    ← LangGraph node (NEW: Planner Agent)
+            │   ├── ChatPromptTemplate          ← chain step
+            │   └── ChatGroq (structured)       ← structured output → EpisodeOutline
             ├── generate_script                 ← LangGraph node
             │   ├── ChatPromptTemplate          ← chain step
             │   ├── ChatGroq                    ← LLM call (tokens, latency)
@@ -220,6 +223,7 @@ def run_podcast_agent(query: str, max_generations: int = 3) -> PodcastResponse:
     # -----------------------------------------------------------------------
     return PodcastResponse(
         status="success",
+        episode_outline=final_state.get("episode_outline"),
         script=final_state.get("script"),
         audio_path=audio_filename,
         generation_count=final_state.get("generation_count", 0),

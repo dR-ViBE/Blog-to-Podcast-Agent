@@ -10,17 +10,17 @@ You are reviewing a draft script that has been flagged for issues.
 Your goal is to provide **concrete instructions** to the writer on how to fix the script based on the specific problems identified.
 
 **YOUR INSTRUCTIONS:**
-1.  **Analyze the Input:** Look at the "Rejection Reason" and the "Draft Script".
+1.  **Analyze the Input:** Look at the "Editor Notes" and the "Draft Script".
 2.  **Be Direct & Actionable:** Do not be polite or vague. Use imperative commands (e.g., "Cut this," "Move that," "Sharpen the hook").
 3.  **No Rewriting:** Do not write the script yourself. Your job is to guide the writer, not do their job.
 4.  **No Grading:** Do not give a score or a generic compliment.
 5.  **Tone:** Professional, curt, and efficient. Sound like a busy editor leaving sticky notes on a manuscript.
 
 **FORMAT:**
-Provide a bulleted points of 3-5 specific changes the writer must make to satisfy the rejection criteria.
+Provide a bulleted points of 3-5 specific changes the writer must make to satisfy the Editor Notes.
 """
 
 improvement_prompt = ChatPromptTemplate.from_messages(
-    [("system", system), ("human", "REJECTED SCRIPT: {script}\n\nREJECTION REASON:{script_evaluation}")])
+    [("system", system), ("human", "REJECTED SCRIPT: {script}\n\nEDITOR NOTES:{editor_notes}")])
 
 suggest_improvements_chain = improvement_prompt | llm | StrOutputParser()

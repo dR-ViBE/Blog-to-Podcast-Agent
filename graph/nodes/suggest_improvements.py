@@ -28,11 +28,11 @@ def suggest_imporvements(state: GraphState, config: RunnableConfig = None) -> Di
         Dict with "improvement_suggestions" (str) field.
     """
     script = state.get("script", "")
-    script_evaluation = state.get("script_evaluation", "")
+    editor_notes = state.get("editor_notes") or state.get("script_evaluation", "")
     generation_count = state.get("generation_count", 0)
 
     # Guard: if either input is missing, return empty suggestions
-    if not script or not script_evaluation:
+    if not script or not editor_notes:
         return {"improvement_suggestions": ""}
 
     # -----------------------------------------------------------------------
@@ -51,13 +51,13 @@ def suggest_imporvements(state: GraphState, config: RunnableConfig = None) -> Di
             "current_node": "suggest_improvements",
             "generation_attempt": generation_count,
             # Truncate to 500 chars for LangSmith metadata (long strings clutter the UI)
-            "rejection_reason_preview": (script_evaluation or "")[:500],
+            "rejection_reason_preview": (editor_notes or "")[:500],
         },
     )
 
     # Invoke the improvements chain, forwarding the enriched config
     suggestions = suggest_improvements_chain.invoke(
-        {"script": script, "script_evaluation": script_evaluation},
+        {"script": script, "editor_notes": editor_notes},
         config=node_config,
     )
 

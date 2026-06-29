@@ -8,12 +8,26 @@ from graph.state import GraphState
 load_dotenv()
 
 
+import re
+
+def preprocess_for_audio(text: str) -> str:
+    """Audio Producer prep: cleans the script for optimal TTS reading."""
+    # Remove markdown bold/italic
+    text = re.sub(r'[\*\#\_]', '', text)
+    # Remove bracketed non-verbal cues e.g. [laughs]
+    text = re.sub(r'\[.*?\]', '', text)
+    # Normalize whitespace
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
 def generate_audio(state: GraphState) -> Dict:
     print("--- GENERATE AUDIO NODE ---")
 
     script = state.get("script", "").strip()
     if not script:
         raise ValueError("No script found in state for audio generation")
+    
+    script = preprocess_for_audio(script)
 
     api_key = os.getenv("ELEVENLABS_API_KEY")
     if not api_key:

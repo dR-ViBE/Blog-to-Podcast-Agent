@@ -92,6 +92,7 @@ def test_import_graph_consts():
     """Graph node name constants must be importable."""
     from graph.consts import (
         RETRIEVE,
+        PLAN_EPISODE,
         GENERATE_SCRIPT,
         GRADE_SCRIPT,
         GENERATE_AUDIO,
@@ -99,6 +100,7 @@ def test_import_graph_consts():
     )
     # Verify the string values haven't been accidentally changed
     assert RETRIEVE == "retrieve"
+    assert PLAN_EPISODE == "plan_episode"
     assert GENERATE_SCRIPT == "generate_script"
     assert GRADE_SCRIPT == "grade_script"
     assert GENERATE_AUDIO == "generate_audio"
@@ -106,7 +108,7 @@ def test_import_graph_consts():
 
 
 def test_import_graph_chains():
-    """All three LangGraph chains must import without errors.
+    """All four LangGraph chains must import without errors.
 
     This implicitly tests that ChatGroq can be instantiated with the
     fake GROQ_API_KEY set in conftest.py, since the chains instantiate
@@ -115,25 +117,29 @@ def test_import_graph_chains():
     from graph.chains.podcast_script_chain import script_generation_chain
     from graph.chains.script_grader_chain import script_grader
     from graph.chains.improvements_chain import suggest_improvements_chain
+    from graph.chains.planner_chain import planner_chain
 
     assert script_generation_chain is not None
     assert script_grader is not None
     assert suggest_improvements_chain is not None
+    assert planner_chain is not None
 
 
 def test_import_graph_nodes():
-    """All five graph nodes must be importable from the nodes package."""
+    """All six graph nodes must be importable from the nodes package."""
     from graph.nodes import (
         generate_audio,
         generate_podcast_script,
         grade_script,
+        plan_episode,              # NEW: Planner Agent
         retrieve_blog_chunks,
-        suggest_imporvements,  # note: typo is preserved from original code
+        suggest_imporvements,      # note: typo is preserved from original code
     )
     assert all([
         generate_audio,
         generate_podcast_script,
         grade_script,
+        plan_episode,
         retrieve_blog_chunks,
         suggest_imporvements,
     ])
@@ -178,3 +184,26 @@ def test_import_fastapi_app():
     from api.main import app
     assert app is not None
     assert app.title == "Blog-to-Podcast Agent API"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PLANNER AGENT IMPORTS (NEW)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_import_outline_model():
+    """The EpisodeOutline and TalkingPoint Pydantic models must be importable."""
+    from graph.chains.outline_model import EpisodeOutline, TalkingPoint
+    assert EpisodeOutline is not None
+    assert TalkingPoint is not None
+
+
+def test_import_planner_chain():
+    """The planner chain must be importable and use structured output."""
+    from graph.chains.planner_chain import planner_chain
+    assert planner_chain is not None
+
+
+def test_import_plan_episode_node():
+    """The plan_episode node function must be importable and callable."""
+    from graph.nodes.plan_episode import plan_episode
+    assert callable(plan_episode)

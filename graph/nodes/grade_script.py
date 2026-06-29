@@ -59,6 +59,8 @@ def grade_script(state: GraphState, config: RunnableConfig = None) -> Dict:
     result = script_grader.invoke({"script": script}, config=node_config)
 
     return {
-        "is_acceptable": result.is_acceptable,
-        "script_evaluation": result.reason,
+        "is_acceptable": result.action == "accept",
+        "script_evaluation": result.notes,
+        "editor_action": result.action,
+        "editor_notes": result.notes,
     }

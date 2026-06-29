@@ -7,7 +7,7 @@
 #   Keeping models in their own file keeps routes.py and services.py clean.
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +57,7 @@ class PodcastResponse(BaseModel):
 
     Attributes:
         status:                  "success" or "failed" string indicator.
+        episode_outline:         The Planner Agent's structured episode plan.
         script:                  The final generated podcast script text.
         audio_path:              Relative path to the saved .mp3 file, or None
                                  if audio generation was not reached.
@@ -67,6 +68,13 @@ class PodcastResponse(BaseModel):
     """
 
     status: str = Field(description="Indicates whether the pipeline succeeded.")
+    episode_outline: Optional[dict] = Field(
+        default=None,
+        description=(
+            "The Planner Agent's structured episode outline, containing "
+            "episode title, hook, talking points, tone guidance, and timing estimates."
+        ),
+    )
     script: Optional[str] = Field(default=None, description="The final podcast script.")
     audio_path: Optional[str] = Field(
         default=None,

@@ -6,17 +6,21 @@ from langchain_groq import ChatGroq
 llm = ChatGroq(model="llama-3.1-8b-instant")
 
 
-class GradeScript(BaseModel):
-    """Binary score for the generated script is acceptable or not,Reason why it is not acceptable"""
-    is_acceptable: bool = Field(
-        description="Boolean.Script meets said podcast quality conditions,'true' or 'false'")
-    reason: str = Field(
-        description="String. A concise explanation of why is_acceptable is True or False.")
+from typing import Literal
 
+class GradeScript(BaseModel):
+    """Editor decision and detailed feedback on the podcast script."""
+    action: Literal["accept", "revision"] = Field(
+        description="The editor's decision: 'accept' if the script is perfect, 'revision' if changes are needed."
+    )
+    notes: str = Field(
+        description="Detailed revision notes for the writer if action is 'revision'. If 'accept', briefly state why it is good."
+    )
 
 structured_llm_grader = llm.with_structured_output(GradeScript)
 
-system = """You are a Senior Podcast Producer and Editor. 
+system = """You are the Podcast Editor Agent. 
+You think like a Senior Podcast Producer.
 Your job is to quality-control a monologue script generated for the "The Insight Loop" podcast.
 
 **GRADING CRITERIA:**
@@ -39,7 +43,8 @@ Your job is to quality-control a monologue script generated for the "The Insight
     * Must be engaging, infotainment style (not a boring lecture).
 
 **OUTPUT INSTRUCTION:**
-If the script violates ANY of these, set 'is_acceptable'(boolean) to False and 'reason'(string) explain why.
+Return 'accept' if the script meets all criteria.
+Return 'revision' and provide DETAILED revision notes if the script violates ANY of these criteria.
 """
 
 grader_prompt = ChatPromptTemplate.from_messages(
