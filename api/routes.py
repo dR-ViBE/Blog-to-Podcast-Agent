@@ -106,6 +106,7 @@ def generate_podcast(request: PodcastRequest) -> PodcastResponse:
         response: PodcastResponse = run_podcast_agent(
             query=request.query,
             max_generations=request.max_generations,
+            source_filter=request.source_filter,
         )
     except RuntimeError as exc:
         # RuntimeError is raised by services.py when the graph itself fails.

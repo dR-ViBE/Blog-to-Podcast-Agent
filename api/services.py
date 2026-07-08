@@ -77,7 +77,7 @@ _LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "podcast-agent")
         "vector_store": "chromadb",
     },
 )
-def run_podcast_agent(query: str, max_generations: int = 3) -> PodcastResponse:
+def run_podcast_agent(query: str, max_generations: int = 3, source_filter: str = None) -> PodcastResponse:
     """
     Orchestrates the full Blog-to-Podcast LangGraph pipeline for a given query.
 
@@ -124,6 +124,7 @@ def run_podcast_agent(query: str, max_generations: int = 3) -> PodcastResponse:
         "query": query,
         "max_generations": max_generations,
         "generation_count": 0,
+        "source_filter": source_filter,  # None means search all sources
     }
 
     logger.info(

@@ -7,7 +7,7 @@
 #   Keeping models in their own file keeps routes.py and services.py clean.
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Dict, List, Optional, Union
 
 
 # ---------------------------------------------------------------------------
@@ -37,6 +37,16 @@ class PodcastRequest(BaseModel):
         ge=1,
         le=10,
         description="Maximum number of script generation attempts before the agent stops.",
+    )
+    source_filter: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional: Filter retrieval to chunks from a specific source. "
+            "Provide a source URL prefix or exact file path that was used during ingestion. "
+            "Example: 'https://lilianweng.github.io' retrieves only chunks from that domain. "
+            "When None, all ingested sources are searched."
+        ),
+        examples=["https://lilianweng.github.io", None],
     )
 
 

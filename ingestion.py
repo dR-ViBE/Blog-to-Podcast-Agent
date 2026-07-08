@@ -1,3 +1,16 @@
+# ⚠️  DEPRECATED — This file is kept for reference only.
+#
+# Use the new multi-source ingestion module instead:
+#   poetry run python -m ingestion.ingest --source <URL_or_file_or_directory>
+#
+# The new module (ingestion/) supports:
+#   - URLs      (Tavily crawl)
+#   - PDFs      (PyPDFLoader)
+#   - Text/MD   (TextLoader)
+#   - Directories (all supported files recursively)
+#
+# See ingestion/ingest.py and ingestion/loaders.py for full documentation.
+
 import json
 from langchain_tavily import TavilyCrawl
 from langchain_ollama import OllamaEmbeddings
