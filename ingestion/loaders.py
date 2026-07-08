@@ -165,7 +165,7 @@ def _load_from_directory(directory: str) -> List[Document]:
                     docs = _load_from_text(str(file))
                 all_docs.extend(docs)
             except Exception as e:
-                print(f"  ⚠ Skipping {file}: {e}")
+                print(f"  [WARNING] Skipping {file}: {e}")
 
     print(f"  [DIR] Total: {len(all_docs)} document(s) loaded from directory.")
     return all_docs
@@ -219,16 +219,16 @@ def ingest_source(source: str) -> int:
         )
 
     if not raw_docs:
-        print("  ⚠ No content found in source. Nothing ingested.")
+        print("  [WARNING] No content found in source. Nothing ingested.")
         return 0
 
     # ── Chunk ─────────────────────────────────────────────────────────────────
     print(f"\n  Chunking {len(raw_docs)} document(s)...")
     chunked_docs = _splitter.split_documents(raw_docs)
-    print(f"  → {len(chunked_docs)} chunks created (size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP})")
+    print(f"  -> {len(chunked_docs)} chunks created (size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP})")
 
     if not chunked_docs:
-        print("  ⚠ No chunks produced. Nothing ingested.")
+        print("  [WARNING] No chunks produced. Nothing ingested.")
         return 0
 
     # ── Embed + Store in ChromaDB ─────────────────────────────────────────────
@@ -244,7 +244,7 @@ def ingest_source(source: str) -> int:
     # Add documents in one batch
     vectorstore.add_documents(chunked_docs)
 
-    print("\n  ✅ Ingestion complete!")
+    print("\n  [SUCCESS] Ingestion complete!")
     print(f"     Source     : {source}")
     print(f"     Chunks     : {len(chunked_docs)}")
     print(f"     Collection : {CHROMA_COLLECTION}")
