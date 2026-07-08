@@ -11,69 +11,79 @@
 
 import importlib
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # THIRD-PARTY PACKAGE IMPORTS
 # Verifies that all packages listed in pyproject.toml are actually installed.
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_import_fastapi():
     """FastAPI must be installed and importable."""
     import fastapi
+
     assert fastapi.__version__ is not None, "FastAPI version should be set"
 
 
 def test_import_langgraph():
     """LangGraph must be installed and importable."""
     import langgraph
+
     assert langgraph is not None
 
 
 def test_import_langchain():
     """LangChain core must be installed and importable."""
     import langchain
+
     assert langchain is not None
 
 
 def test_import_langchain_groq():
     """langchain-groq (Groq LLM integration) must be installed."""
     from langchain_groq import ChatGroq
+
     assert ChatGroq is not None
 
 
 def test_import_langchain_ollama():
     """langchain-ollama (embedding model integration) must be installed."""
     from langchain_ollama import OllamaEmbeddings
+
     assert OllamaEmbeddings is not None
 
 
 def test_import_langchain_chroma():
     """langchain-chroma (vector store integration) must be installed."""
     from langchain_chroma import Chroma
+
     assert Chroma is not None
 
 
 def test_import_langsmith():
     """LangSmith (observability) must be installed."""
     import langsmith
+
     assert langsmith is not None
 
 
 def test_import_streamlit():
     """Streamlit (frontend framework) must be installed."""
     import streamlit
+
     assert streamlit.__version__ is not None
 
 
 def test_import_uvicorn():
     """Uvicorn (ASGI server) must be installed."""
     import uvicorn
+
     assert uvicorn is not None
 
 
 def test_import_elevenlabs():
     """ElevenLabs SDK must be installed."""
     from elevenlabs.client import ElevenLabs
+
     assert ElevenLabs is not None
 
 
@@ -82,21 +92,24 @@ def test_import_elevenlabs():
 # Verifies that the project's own modules load correctly.
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_import_graph_state():
     """The LangGraph state schema must be importable."""
     from graph.state import GraphState
+
     assert GraphState is not None
 
 
 def test_import_graph_consts():
     """Graph node name constants must be importable."""
     from graph.consts import (
-        RETRIEVE,
+        GENERATE_AUDIO,
         GENERATE_SCRIPT,
         GRADE_SCRIPT,
-        GENERATE_AUDIO,
+        RETRIEVE,
         SUGGEST_IMPROVEMENTS,
     )
+
     # Verify the string values haven't been accidentally changed
     assert RETRIEVE == "retrieve"
     assert GENERATE_SCRIPT == "generate_script"
@@ -112,9 +125,9 @@ def test_import_graph_chains():
     fake GROQ_API_KEY set in conftest.py, since the chains instantiate
     ChatGroq at module load time.
     """
+    from graph.chains.improvements_chain import suggest_improvements_chain
     from graph.chains.podcast_script_chain import script_generation_chain
     from graph.chains.script_grader_chain import script_grader
-    from graph.chains.improvements_chain import suggest_improvements_chain
 
     assert script_generation_chain is not None
     assert script_grader is not None
@@ -130,13 +143,16 @@ def test_import_graph_nodes():
         retrieve_blog_chunks,
         suggest_imporvements,  # note: typo is preserved from original code
     )
-    assert all([
-        generate_audio,
-        generate_podcast_script,
-        grade_script,
-        retrieve_blog_chunks,
-        suggest_imporvements,
-    ])
+
+    assert all(
+        [
+            generate_audio,
+            generate_podcast_script,
+            grade_script,
+            retrieve_blog_chunks,
+            suggest_imporvements,
+        ]
+    )
 
 
 def test_import_compiled_graph():
@@ -146,12 +162,14 @@ def test_import_compiled_graph():
     import chain: graph.py → nodes → chains → ChatGroq instantiation.
     """
     from graph.graph import app as langgraph_app
+
     assert langgraph_app is not None
 
 
 def test_import_api_models():
     """FastAPI Pydantic models must be importable."""
-    from api.models import PodcastRequest, PodcastResponse, HealthResponse
+    from api.models import HealthResponse, PodcastRequest, PodcastResponse
+
     assert PodcastRequest is not None
     assert PodcastResponse is not None
     assert HealthResponse is not None
@@ -160,12 +178,14 @@ def test_import_api_models():
 def test_import_api_routes():
     """FastAPI router must be importable."""
     from api.routes import router
+
     assert router is not None
 
 
 def test_import_api_services():
     """The service layer must be importable."""
     from api.services import run_podcast_agent
+
     assert callable(run_podcast_agent)
 
 
@@ -176,5 +196,6 @@ def test_import_fastapi_app():
     api/main.py → api/routes.py → api/services.py → graph/graph.py → (all nodes and chains)
     """
     from api.main import app
+
     assert app is not None
     assert app.title == "Blog-to-Podcast Agent API"

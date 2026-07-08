@@ -1,12 +1,13 @@
-from graph.state import GraphState
-from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
+import json
 from typing import Dict, List, Optional
+
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableConfig
-import json
+from langchain_ollama import OllamaEmbeddings
 
 from graph.chains.retriever_chain import retriever_chain
+from graph.state import GraphState
 
 
 def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Dict:
@@ -38,9 +39,7 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
         raise ValueError("retrieve_blog_chunks requires 'query' in state")
 
     # ── 1. Generate Retrieval Strategy ────────────────────────────────────────
-    strategy = retriever_chain.invoke(
-        {"outline": json.dumps(episode_outline, indent=2)}
-    )
+    strategy = retriever_chain.invoke({"outline": json.dumps(episode_outline, indent=2)})
 
     # ── 2. Vectorstore Setup ──────────────────────────────────────────────────
     vectorstore = Chroma(

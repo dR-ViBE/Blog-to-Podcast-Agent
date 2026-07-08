@@ -28,25 +28,24 @@
 
 from langgraph.graph import END, StateGraph
 
-from graph.state import GraphState
+from graph.conditionals import decide_next_step
 from graph.consts import (
-    RETRIEVE,
-    PLAN_EPISODE,          # NEW: Planner Agent
+    GENERATE_AUDIO,
     GENERATE_SCRIPT,
     GRADE_SCRIPT,
-    GENERATE_AUDIO,
+    PLAN_EPISODE,  # NEW: Planner Agent
+    RETRIEVE,
     SUGGEST_IMPROVEMENTS,
 )
 from graph.nodes import (
     generate_audio,
-    grade_script,
     generate_podcast_script,
-    plan_episode,          # NEW: Planner Agent node function
+    grade_script,
+    plan_episode,  # NEW: Planner Agent node function
     retrieve_blog_chunks,
     suggest_imporvements,
 )
-from graph.conditionals import decide_next_step
-
+from graph.state import GraphState
 
 # ─── Create the StateGraph ──────────────────────────────────────────────────
 # StateGraph manages a shared state dict (GraphState) that flows through
@@ -59,12 +58,12 @@ workflow = StateGraph(GraphState)
 # Each node is a Python function registered under a string name.
 # The string name is used in edge definitions below.
 
-workflow.add_node(RETRIEVE, retrieve_blog_chunks)            # Retriever Agent
-workflow.add_node(PLAN_EPISODE, plan_episode)                # Planner Agent (NEW)
+workflow.add_node(RETRIEVE, retrieve_blog_chunks)  # Retriever Agent
+workflow.add_node(PLAN_EPISODE, plan_episode)  # Planner Agent (NEW)
 workflow.add_node(GENERATE_SCRIPT, generate_podcast_script)  # Writer Agent
-workflow.add_node(GRADE_SCRIPT, grade_script)                # Editor Agent (grading)
+workflow.add_node(GRADE_SCRIPT, grade_script)  # Editor Agent (grading)
 workflow.add_node(SUGGEST_IMPROVEMENTS, suggest_imporvements)  # Editor Agent (feedback)
-workflow.add_node(GENERATE_AUDIO, generate_audio)            # Audio Agent
+workflow.add_node(GENERATE_AUDIO, generate_audio)  # Audio Agent
 
 
 # ─── Define Edges (execution order) ─────────────────────────────────────────

@@ -28,7 +28,6 @@ from langchain_groq import ChatGroq
 
 from graph.chains.outline_model import EpisodeOutline
 
-
 # ─── LLM Configuration ──────────────────────────────────────────────────────
 # We use the same model as all other chains for consistency.
 # `with_structured_output()` wraps the LLM so it returns an EpisodeOutline
@@ -94,10 +93,12 @@ You are NOT the writer. You are the planner. You decide WHAT to talk about and i
 # One input variable:
 #   - query:   The user's search topic (e.g., "AI Agents")
 
-planner_prompt = ChatPromptTemplate.from_messages([
-    ("system", system),
-    ("human", "USER QUERY: {query}"),
-])
+planner_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system),
+        ("human", "USER QUERY: {query}"),
+    ]
+)
 
 
 # ─── Assembled Chain ─────────────────────────────────────────────────────────

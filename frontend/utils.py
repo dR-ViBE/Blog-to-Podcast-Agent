@@ -8,7 +8,6 @@
 
 import requests  # The library used to make HTTP requests to the FastAPI backend
 
-
 # ---------------------------------------------------------------------------
 # DATA CONTAINERS
 # ---------------------------------------------------------------------------

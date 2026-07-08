@@ -22,8 +22,9 @@
 #   Audio    → reads "script",                           writes "audio_output"
 
 from typing import List, Optional
-from typing_extensions import TypedDict
+
 from langchain_core.documents import Document
+from typing_extensions import TypedDict
 
 
 class GraphState(TypedDict):
@@ -57,16 +58,16 @@ class GraphState(TypedDict):
 
     url: str
     query: str
-    source_filter: Optional[str]          # NEW: optional ChromaDB where-filter by source
+    source_filter: Optional[str]  # NEW: optional ChromaDB where-filter by source
     documents: List[Document]
-    episode_outline: Optional[dict]        # Planner Agent output
-    retrieval_strategy: Optional[dict]     # Retriever strategy output
+    episode_outline: Optional[dict]  # Planner Agent output
+    retrieval_strategy: Optional[dict]  # Retriever strategy output
     script: str
     is_acceptable: bool
     script_evaluation: str
     improvement_suggestions: str
-    editor_action: Optional[str]           # Editor Agent decision (accept/revision)
-    editor_notes: Optional[str]            # Editor Agent detailed feedback
+    editor_action: Optional[str]  # Editor Agent decision (accept/revision)
+    editor_notes: Optional[str]  # Editor Agent detailed feedback
     generation_count: int
     max_generations: int
     audio_output: str

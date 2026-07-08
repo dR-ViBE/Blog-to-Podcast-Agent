@@ -38,8 +38,8 @@ WHY THIS APPROACH:
 import json
 import os
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add project root to path so we can import graph modules
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -53,7 +53,6 @@ from langchain_ollama import OllamaEmbeddings
 from sentence_transformers import CrossEncoder
 
 from graph.chains.retriever_chain import retriever_chain
-
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -150,24 +149,27 @@ def evaluate():
             print(f"    ⚠ Retrieval failed: {e}")
             contexts = []
 
-        samples.append({
-            "user_input": query,
-            "retrieved_contexts": contexts,
-            "reference": " ".join(ground_truths),  # RAGAS expects a single reference string
-        })
+        samples.append(
+            {
+                "user_input": query,
+                "retrieved_contexts": contexts,
+                "reference": " ".join(ground_truths),  # RAGAS expects a single reference string
+            }
+        )
 
     # ── Run RAGAS scoring ─────────────────────────────────────────────────────
     print("\nRunning RAGAS scoring (LLM-as-judge via Groq)...")
     print("This may take 1-2 minutes.\n")
 
     try:
-        from ragas import evaluate as ragas_evaluate, EvaluationDataset, SingleTurnSample
+        from langchain_groq import ChatGroq
+        from langchain_ollama import OllamaEmbeddings
+        from ragas import EvaluationDataset, SingleTurnSample
+        from ragas import evaluate as ragas_evaluate
         from ragas.metrics import (
             ContextPrecision,
             ContextRecall,
         )
-        from langchain_groq import ChatGroq
-        from langchain_ollama import OllamaEmbeddings
 
         # Use Groq as the judge LLM (free tier)
         judge_llm = ChatGroq(model="llama-3.1-8b-instant")

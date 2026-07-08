@@ -13,7 +13,7 @@
 
 RETRIEVE = "retrieve"
 
-PLAN_EPISODE = "plan_episode"          # NEW: Planner Agent node
+PLAN_EPISODE = "plan_episode"  # NEW: Planner Agent node
 
 GENERATE_SCRIPT = "generate_script"
 

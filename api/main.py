@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # for automatic tracing of LangChain and LangGraph calls.
 try:
     from langsmith import Client as LangSmithClient
+
     _LANGSMITH_AVAILABLE = True
 except ImportError:
     _LANGSMITH_AVAILABLE = False
@@ -135,18 +136,14 @@ async def lifespan(app: FastAPI):
                 logger.info("LangSmith credentials verified successfully.")
             except Exception as exc:
                 # Don't crash the server — just warn the operator
-                logger.warning(
-                    "LangSmith credential check failed (tracing may not work): %s", exc
-                )
+                logger.warning("LangSmith credential check failed (tracing may not work): %s", exc)
     elif tracing_enabled and not langsmith_key_set:
         logger.warning(
             "LANGCHAIN_TRACING_V2=true but LANGCHAIN_API_KEY is not set. "
             "Tracing will be silently disabled by LangChain."
         )
     else:
-        logger.info(
-            "LangSmith tracing DISABLED. Set LANGCHAIN_TRACING_V2=true in .env to enable."
-        )
+        logger.info("LangSmith tracing DISABLED. Set LANGCHAIN_TRACING_V2=true in .env to enable.")
     # ── End LangSmith startup check ─────────────────────────────────────────
 
     logger.info("Blog-to-Podcast API is ready to accept requests.")
@@ -186,7 +183,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # TODO: restrict to your frontend domain in prod
+    allow_origins=["*"],  # TODO: restrict to your frontend domain in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -209,4 +206,5 @@ app.include_router(router, prefix="")
 def root():
     """Redirect API root to the interactive Swagger UI docs."""
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/docs")

@@ -96,9 +96,7 @@ def generate_podcast_script(state: GraphState, config: RunnableConfig = None) ->
     improvement_suggestions = state.get("improvement_suggestions", "")
 
     # Combine all document contents into a single context string
-    context = "\n\n".join(
-        doc.page_content for doc in documents if isinstance(doc, Document)
-    )
+    context = "\n\n".join(doc.page_content for doc in documents if isinstance(doc, Document))
 
     # Read and increment generation count
     generation_count = state.get("generation_count", 0) + 1

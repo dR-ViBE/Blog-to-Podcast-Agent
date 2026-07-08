@@ -35,6 +35,7 @@ WHY A CLI:
 
 import argparse
 import sys
+
 from ingestion.loaders import ingest_source
 
 
@@ -84,18 +85,18 @@ def main():
             failed.append(source)
 
     # ── Summary ───────────────────────────────────────────────────────────────
-    print(f"\n{'='*60}")
-    print(f"  INGESTION SUMMARY")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("  INGESTION SUMMARY")
+    print(f"{'=' * 60}")
     print(f"  Sources processed : {len(args.sources)}")
     print(f"  Successful        : {len(args.sources) - len(failed)}")
     print(f"  Failed            : {len(failed)}")
     print(f"  Total chunks      : {total_chunks}")
     if failed:
-        print(f"\n  Failed sources:")
+        print("\n  Failed sources:")
         for f in failed:
             print(f"    - {f}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # Exit with non-zero code if any source failed (useful for CI)
     if failed:

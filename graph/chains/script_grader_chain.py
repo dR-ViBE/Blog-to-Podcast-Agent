@@ -1,17 +1,20 @@
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
 from langchain_core.runnables import RunnableSequence
 from langchain_groq import ChatGroq
+from pydantic import BaseModel, Field
 
 llm = ChatGroq(model="llama-3.1-8b-instant")
 
 
 class GradeScript(BaseModel):
     """Binary score for the generated script is acceptable or not,Reason why it is not acceptable"""
+
     is_acceptable: bool = Field(
-        description="Boolean.Script meets said podcast quality conditions,'true' or 'false'")
+        description="Boolean.Script meets said podcast quality conditions,'true' or 'false'"
+    )
     reason: str = Field(
-        description="String. A concise explanation of why is_acceptable is True or False.")
+        description="String. A concise explanation of why is_acceptable is True or False."
+    )
 
 
 structured_llm_grader = llm.with_structured_output(GradeScript)
@@ -43,6 +46,7 @@ If the script violates ANY of these, set 'is_acceptable'(boolean) to False and '
 """
 
 grader_prompt = ChatPromptTemplate.from_messages(
-    [("system", system), ("human", "Generated Script:\n\n{script}")])
+    [("system", system), ("human", "Generated Script:\n\n{script}")]
+)
 
 script_grader: RunnableSequence = grader_prompt | structured_llm_grader

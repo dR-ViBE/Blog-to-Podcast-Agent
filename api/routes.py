@@ -40,12 +40,13 @@ AUDIO_OUTPUT_DIR = Path("outputs/audio")
 # HEALTH CHECK
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/health",
     response_model=HealthResponse,
     summary="Health Check",
     description="Returns a simple `{status: healthy}` payload. "
-                "Used by load balancers and uptime monitors.",
+    "Used by load balancers and uptime monitors.",
     tags=["Utility"],
 )
 def health_check() -> HealthResponse:
@@ -61,6 +62,7 @@ def health_check() -> HealthResponse:
 # ---------------------------------------------------------------------------
 # GENERATE PODCAST
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/podcast",
@@ -111,18 +113,14 @@ def generate_podcast(request: PodcastRequest) -> PodcastResponse:
     except RuntimeError as exc:
         # RuntimeError is raised by services.py when the graph itself fails.
         # We convert it to a 500 HTTP response with a clear message.
-        logger.error(
-            "Pipeline error | query=%r | error=%s", request.query, exc
-        )
+        logger.error("Pipeline error | query=%r | error=%s", request.query, exc)
         raise HTTPException(
             status_code=500,
             detail=f"Podcast pipeline failed: {exc}",
         )
     except Exception as exc:
         # Catch-all for any unexpected error not covered by services.py
-        logger.exception(
-            "Unexpected error | query=%r | error=%s", request.query, exc
-        )
+        logger.exception("Unexpected error | query=%r | error=%s", request.query, exc)
         raise HTTPException(
             status_code=500,
             detail="An unexpected internal error occurred. Check server logs.",
@@ -139,6 +137,7 @@ def generate_podcast(request: PodcastRequest) -> PodcastResponse:
 # ---------------------------------------------------------------------------
 # SERVE AUDIO FILE
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/audio/{filename}",
@@ -200,7 +199,7 @@ def serve_audio(filename: str) -> FileResponse:
         raise HTTPException(
             status_code=404,
             detail=f"Audio file '{safe_filename}' not found. "
-                   "Ensure the podcast was generated successfully.",
+            "Ensure the podcast was generated successfully.",
         )
 
     return FileResponse(

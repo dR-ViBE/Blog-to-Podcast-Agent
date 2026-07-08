@@ -35,7 +35,7 @@ from typing import List
 
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
-from langchain_community.document_loaders import PyPDFLoader, TextLoader, DirectoryLoader
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -47,8 +47,8 @@ load_dotenv()
 CHROMA_COLLECTION = "blog_podcast_agent"
 CHROMA_DIR = "./.chroma"
 EMBEDDING_MODEL = "nomic-embed-text"
-CHUNK_SIZE = 300      # tokens — same as the original ingestion.py
-CHUNK_OVERLAP = 50    # tokens — 50-token overlap preserves sentence boundaries
+CHUNK_SIZE = 300  # tokens — same as the original ingestion.py
+CHUNK_OVERLAP = 50  # tokens — 50-token overlap preserves sentence boundaries
 
 # File extensions recognised when scanning a directory
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".rst", ".pdf"}
@@ -64,6 +64,7 @@ _splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
 
 # ─── Individual Loaders ───────────────────────────────────────────────────────
 
+
 def _load_from_url(url: str) -> List[Document]:
     """
     Crawls a URL using Tavily and returns LangChain Documents.
@@ -72,7 +73,9 @@ def _load_from_url(url: str) -> List[Document]:
     try:
         from langchain_tavily import TavilyCrawl
     except ImportError:
-        raise ImportError("langchain-tavily is required for URL ingestion. Run: poetry add langchain-tavily")
+        raise ImportError(
+            "langchain-tavily is required for URL ingestion. Run: poetry add langchain-tavily"
+        )
 
     print(f"  [URL] Crawling: {url}")
     tavily_crawl = TavilyCrawl()
@@ -90,14 +93,16 @@ def _load_from_url(url: str) -> List[Document]:
         content = page.get("content") or page.get("raw_content") or ""
         if not content:
             continue
-        documents.append(Document(
-            page_content=content,
-            metadata={
-                "source": page.get("url", url),
-                "source_type": "url",
-                "title": page.get("title", ""),
-            },
-        ))
+        documents.append(
+            Document(
+                page_content=content,
+                metadata={
+                    "source": page.get("url", url),
+                    "source_type": "url",
+                    "title": page.get("title", ""),
+                },
+            )
+        )
 
     print(f"  [URL] Loaded {len(documents)} pages from crawl.")
     return documents
@@ -168,6 +173,7 @@ def _load_from_directory(directory: str) -> List[Document]:
 
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
 
+
 def ingest_source(source: str) -> int:
     """
     Unified ingestion function. Detects the source type, loads documents,
@@ -186,9 +192,9 @@ def ingest_source(source: str) -> int:
         ValueError: If the source type cannot be determined.
         FileNotFoundError: If a local path does not exist.
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Ingesting source: {source}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # ── Detect source type ────────────────────────────────────────────────────
     if source.startswith("http://") or source.startswith("https://"):
@@ -205,13 +211,11 @@ def ingest_source(source: str) -> int:
             raw_docs = _load_from_text(source)
         else:
             raise ValueError(
-                f"Unsupported file extension: '{suffix}'. "
-                f"Supported: .pdf, .txt, .md, .rst"
+                f"Unsupported file extension: '{suffix}'. Supported: .pdf, .txt, .md, .rst"
             )
     else:
         raise FileNotFoundError(
-            f"Source not found: '{source}'. "
-            "Provide a valid URL, file path, or directory."
+            f"Source not found: '{source}'. Provide a valid URL, file path, or directory."
         )
 
     if not raw_docs:
@@ -228,7 +232,7 @@ def ingest_source(source: str) -> int:
         return 0
 
     # ── Embed + Store in ChromaDB ─────────────────────────────────────────────
-    print(f"\n  Embedding and storing in ChromaDB...")
+    print("\n  Embedding and storing in ChromaDB...")
     print(f"  Collection: '{CHROMA_COLLECTION}' | Directory: '{CHROMA_DIR}'")
 
     vectorstore = Chroma(
@@ -240,10 +244,10 @@ def ingest_source(source: str) -> int:
     # Add documents in one batch
     vectorstore.add_documents(chunked_docs)
 
-    print(f"\n  ✅ Ingestion complete!")
+    print("\n  ✅ Ingestion complete!")
     print(f"     Source     : {source}")
     print(f"     Chunks     : {len(chunked_docs)}")
     print(f"     Collection : {CHROMA_COLLECTION}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     return len(chunked_docs)

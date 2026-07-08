@@ -12,12 +12,13 @@
 # See ingestion/ingest.py and ingestion/loaders.py for full documentation.
 
 import json
-from langchain_tavily import TavilyCrawl
-from langchain_ollama import OllamaEmbeddings
+
+from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+from langchain_ollama import OllamaEmbeddings
+from langchain_tavily import TavilyCrawl
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -45,7 +46,7 @@ documents = []
 for page in pages:
     # content could be None, so we force it to string with ( ... or "")
     content = page.get("content") or page.get("raw_content") or ""
-    
+
     # Optional: Skip pages with no content to avoid ingestion issues
     if not content:
         continue
@@ -61,17 +62,18 @@ for page in pages:
     )
 
 text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-    chunk_size=300, chunk_overlap=50)
+    chunk_size=300, chunk_overlap=50
+)
 
 chunked_docs = text_splitter.split_documents(documents)
 
 # Check if we actually have documents to ingest
 if chunked_docs:
     vectorstore = Chroma.from_documents(
-        documents=chunked_docs, 
+        documents=chunked_docs,
         collection_name="blog_podcast_agent",
         embedding=OllamaEmbeddings(model="nomic-embed-text"),
-        persist_directory="./.chroma"
+        persist_directory="./.chroma",
     )
     print(f" Ingestion complete. Stored {len(chunked_docs)} chunks.")
 else:

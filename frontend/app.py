@@ -11,10 +11,11 @@
 # This app ONLY talks to the FastAPI backend — it never calls LangGraph directly.
 
 import os
+
 import streamlit as st
 
 # Import our API helper functions from utils.py
-from utils import make_podcast_request, fetch_audio_bytes, check_api_health
+from utils import check_api_health, fetch_audio_bytes, make_podcast_request
 
 # ---------------------------------------------------------------------------
 # ENVIRONMENT CONFIGURATION
@@ -34,7 +35,7 @@ _DEFAULT_API_URL: str = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 st.set_page_config(
     page_title="Blog to Podcast Agent",
     page_icon="🎙️",
-    layout="wide",                # Use the full browser width
+    layout="wide",  # Use the full browser width
     initial_sidebar_state="expanded",
 )
 
@@ -150,11 +151,11 @@ def init_session_state():
     On subsequent re-runs these values are already set, so nothing changes.
     """
     defaults = {
-        "result": None,        # Stores the last API response dictionary
-        "audio_bytes": None,   # Stores the raw MP3 bytes for the audio player
-        "audio_filename": None, # Stores the MP3 filename for the download button
-        "is_loading": False,   # True while the API call is in progress
-        "error_message": None, # Stores an error string to display, if any
+        "result": None,  # Stores the last API response dictionary
+        "audio_bytes": None,  # Stores the raw MP3 bytes for the audio player
+        "audio_filename": None,  # Stores the MP3 filename for the download button
+        "is_loading": False,  # True while the API call is in progress
+        "error_message": None,  # Stores an error string to display, if any
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -190,9 +191,9 @@ def render_sidebar() -> tuple[str, int]:
         # --- API URL ---
         st.markdown("**🔗 API Base URL**")
         api_base_url = st.text_input(
-            label="API Base URL",              # Accessibility label (hidden visually)
-            value=_DEFAULT_API_URL,            # Set by API_BASE_URL env var (Docker)
-            label_visibility="collapsed",      # Hide label — we show our own above
+            label="API Base URL",  # Accessibility label (hidden visually)
+            value=_DEFAULT_API_URL,  # Set by API_BASE_URL env var (Docker)
+            label_visibility="collapsed",  # Hide label — we show our own above
             help=(
                 "The URL where your FastAPI backend is running. "
                 "In Docker this is set automatically via the API_BASE_URL "
@@ -208,7 +209,9 @@ def render_sidebar() -> tuple[str, int]:
             if is_healthy:
                 st.success("✅ API is online and healthy.")
             else:
-                st.error("❌ API is offline. Start it with:\n`poetry run uvicorn api.main:app --reload`")
+                st.error(
+                    "❌ API is offline. Start it with:\n`poetry run uvicorn api.main:app --reload`"
+                )
 
         st.markdown("---")
 
@@ -335,7 +338,7 @@ def render_results(api_base_url: str):
                 value=script,
                 height=350,
                 label_visibility="collapsed",
-                disabled=True,   # Read-only — user doesn't need to edit this
+                disabled=True,  # Read-only — user doesn't need to edit this
                 key="script_display",
             )
 
@@ -426,7 +429,7 @@ def main():
     with col_btn1:
         generate_clicked = st.button(
             "🎙️ Generate Podcast",
-            type="primary",        # Makes it the prominent blue button
+            type="primary",  # Makes it the prominent blue button
             use_container_width=True,
             key="generate_btn",
             disabled=st.session_state["is_loading"],  # Disable while loading
@@ -448,11 +451,10 @@ def main():
 
     # ── HANDLE GENERATE ────────────────────────────────────────────────────
     if generate_clicked:
-
         # --- Basic client-side validation ---
         if not query or len(query.strip()) < 3:
             st.warning("⚠️ Please enter a query of at least 3 characters.")
-            st.stop()   # Stop processing the rest of the script
+            st.stop()  # Stop processing the rest of the script
 
         # Clear any previous results before starting a new run
         reset_results()
@@ -461,7 +463,6 @@ def main():
         # --- API Call ---
         # st.status() creates a collapsible progress container
         with st.status("🚀 Podcast pipeline running...", expanded=True) as status_box:
-
             st.write("📡 Connecting to FastAPI backend...")
             st.write(f"🔍 Retrieving blog chunks for query: **{query}**")
             st.write("✍️ Generating podcast script with Groq (LLaMA 3.1)...")
@@ -481,16 +482,12 @@ def main():
                 # Store the result in session_state so it survives the re-run
                 st.session_state["result"] = api_result["data"]
                 st.session_state["is_loading"] = False
-                status_box.update(
-                    label="✅ Podcast generated successfully!", state="complete"
-                )
+                status_box.update(label="✅ Podcast generated successfully!", state="complete")
             else:
                 # Store the error message and clear loading state
                 st.session_state["error_message"] = api_result["error"]
                 st.session_state["is_loading"] = False
-                status_box.update(
-                    label="❌ Pipeline failed. See error below.", state="error"
-                )
+                status_box.update(label="❌ Pipeline failed. See error below.", state="error")
 
         # Force a re-run so the results section appears cleanly
         st.rerun()

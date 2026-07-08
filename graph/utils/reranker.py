@@ -1,5 +1,6 @@
-from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain.retrievers.document_compressors import CrossEncoderReranker
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+
 
 def get_reranker(top_n: int = 5):
     """

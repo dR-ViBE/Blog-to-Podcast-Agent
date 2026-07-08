@@ -1,6 +1,6 @@
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_groq import ChatGroq
 
 llm = ChatGroq(model="llama-3.1-8b-instant")
 
@@ -21,6 +21,10 @@ Provide a bulleted points of 3-5 specific changes the writer must make to satisf
 """
 
 improvement_prompt = ChatPromptTemplate.from_messages(
-    [("system", system), ("human", "REJECTED SCRIPT: {script}\n\nREJECTION REASON:{script_evaluation}")])
+    [
+        ("system", system),
+        ("human", "REJECTED SCRIPT: {script}\n\nREJECTION REASON:{script_evaluation}"),
+    ]
+)
 
 suggest_improvements_chain = improvement_prompt | llm | StrOutputParser()

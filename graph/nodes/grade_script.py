@@ -15,8 +15,8 @@ from typing import Dict
 
 from langchain_core.runnables import RunnableConfig
 
-from graph.state import GraphState
 from graph.chains.script_grader_chain import script_grader
+from graph.state import GraphState
 
 
 def grade_script(state: GraphState, config: RunnableConfig = None) -> Dict:

@@ -6,13 +6,14 @@
 #   produce clean, self-documented JSON schemas for API consumers.
 #   Keeping models in their own file keeps routes.py and services.py clean.
 
-from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Union
 
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # REQUEST MODEL
 # ---------------------------------------------------------------------------
+
 
 class PodcastRequest(BaseModel):
     """
@@ -53,6 +54,7 @@ class PodcastRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # RESPONSE MODEL
 # ---------------------------------------------------------------------------
+
 
 class PodcastResponse(BaseModel):
     """
@@ -100,6 +102,7 @@ class PodcastResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # HEALTH RESPONSE MODEL
 # ---------------------------------------------------------------------------
+
 
 class HealthResponse(BaseModel):
     """

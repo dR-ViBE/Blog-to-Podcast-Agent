@@ -1,11 +1,12 @@
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+
 # from pydantic import Field, BaseModel
 from langchain_groq import ChatGroq
-from langchain_core.output_parsers import StrOutputParser
 
 llm = ChatGroq(model="llama-3.1-8b-instant")
 
-system = """You are the host of a popular infotainment podcast called "The Insight Loop". 
+system = r"""You are the host of a popular infotainment podcast called "The Insight Loop". 
 Your persona is a young, trendy, and charismatic domain expert who loves breaking down complex topics for a general audience.
 Your tone is semi-formal but witty—you make casual jokes and use modern but professional language.
 
@@ -28,6 +29,7 @@ INSTRUCTIONS:
 """
 
 script_prompt = ChatPromptTemplate.from_messages(
-    [("system", system), ("human", "Retrieved context documents:\n\n {context}")])
+    [("system", system), ("human", "Retrieved context documents:\n\n {context}")]
+)
 
 script_generation_chain = script_prompt | llm | StrOutputParser()

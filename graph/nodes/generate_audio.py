@@ -1,8 +1,10 @@
-from typing import Dict
 import os
 import uuid
+from typing import Dict
+
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
+
 from graph.state import GraphState
 
 load_dotenv()
@@ -45,6 +47,4 @@ def generate_audio(state: GraphState) -> Dict:
 
     print(f"Audio saved to: {output_path}")
 
-    return {
-        "audio_output": output_path
-    }
+    return {"audio_output": output_path}

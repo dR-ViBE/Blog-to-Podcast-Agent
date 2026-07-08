@@ -19,6 +19,7 @@
 #   Planner Agent ──produces──▶ EpisodeOutline ──consumed by──▶ Writer Agent
 
 from typing import List
+
 from pydantic import BaseModel, Field
 
 
@@ -41,9 +42,7 @@ class TalkingPoint(BaseModel):
                                     Example: 45 (means ~45 seconds of speaking time)
     """
 
-    topic: str = Field(
-        description="The theme or heading for this section of the podcast body."
-    )
+    topic: str = Field(description="The theme or heading for this section of the podcast body.")
     key_insight: str = Field(
         description=(
             "The single most important idea the writer must convey in this section. "
@@ -52,8 +51,8 @@ class TalkingPoint(BaseModel):
     )
     estimated_duration_seconds: int = Field(
         default=45,
-        ge=15,    # Minimum 15 seconds per section (prevents trivial points)
-        le=120,   # Maximum 2 minutes per section (prevents monolithic blocks)
+        ge=15,  # Minimum 15 seconds per section (prevents trivial points)
+        le=120,  # Maximum 2 minutes per section (prevents monolithic blocks)
         description="Estimated speaking duration for this section in seconds.",
     )
 
@@ -96,13 +95,13 @@ class EpisodeOutline(BaseModel):
     )
 
     key_talking_points: List[TalkingPoint] = Field(
-        min_length=3,   # At least 3 sections for substance
-        max_length=5,   # At most 5 sections to stay within 3-5 minutes
+        min_length=3,  # At least 3 sections for substance
+        max_length=5,  # At most 5 sections to stay within 3-5 minutes
         description=(
             "An ordered list of 3-5 talking points that form the body of the episode. "
             "Each point covers one key idea from the source material. "
             "The writer MUST follow this order."
-        )
+        ),
     )
 
     target_audience: str = Field(
@@ -122,13 +121,13 @@ class EpisodeOutline(BaseModel):
     )
 
     total_estimated_duration_seconds: int = Field(
-        ge=180,   # Minimum 3 minutes
-        le=300,   # Maximum 5 minutes
+        ge=180,  # Minimum 3 minutes
+        le=300,  # Maximum 5 minutes
         description=(
             "Target total speaking duration for the entire episode in seconds. "
             "Must be between 180 (3 min) and 300 (5 min). "
             "The sum of talking point durations + intro + outro should match this."
-        )
+        ),
     )
 
     sign_off_suggestion: str = Field(

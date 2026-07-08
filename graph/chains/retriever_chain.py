@@ -1,10 +1,11 @@
-from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
+from pydantic import BaseModel, Field
 
 
 class RetrievalStrategy(BaseModel):
     """Structured strategy for multi-query retrieval based on the planner's outline."""
+
     main_topic: str = Field(description="The core topic of the episode.")
     important_concepts: str = Field(description="Key concepts that must be explained.")
     supporting_concepts: str = Field(description="Secondary ideas to add depth.")
@@ -37,9 +38,11 @@ Your job is to read an episode outline provided by the Planner Agent and develop
 Make the queries targeted and specific. Do not use generic terms.
 """
 
-retriever_prompt = ChatPromptTemplate.from_messages([
-    ("system", system),
-    ("human", "EPISODE OUTLINE:\n\n{outline}"),
-])
+retriever_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system),
+        ("human", "EPISODE OUTLINE:\n\n{outline}"),
+    ]
+)
 
 retriever_chain = retriever_prompt | structured_retriever_llm

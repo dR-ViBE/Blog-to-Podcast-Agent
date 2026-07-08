@@ -14,12 +14,6 @@ import logging
 import os
 from pathlib import Path
 
-# LangSmith's @traceable decorator wraps any Python function and creates a
-# parent trace in LangSmith. All LangChain/LangGraph calls made inside the
-# function automatically become child runs of this parent trace.
-# This gives you a single "root" trace per user request in LangSmith.
-from langsmith import traceable
-
 # RunnableConfig is LangChain's standard way to pass runtime configuration
 # to any chain or graph invocation. It carries:
 #   - metadata  : a dict of key/value pairs visible in LangSmith traces
@@ -27,8 +21,14 @@ from langsmith import traceable
 #   - run_name   : the display name of the run in LangSmith UI
 from langchain_core.runnables import RunnableConfig
 
-from graph.graph import app as langgraph_app  # The compiled LangGraph StateGraph
+# LangSmith's @traceable decorator wraps any Python function and creates a
+# parent trace in LangSmith. All LangChain/LangGraph calls made inside the
+# function automatically become child runs of this parent trace.
+# This gives you a single "root" trace per user request in LangSmith.
+from langsmith import traceable
+
 from api.models import PodcastResponse
+from graph.graph import app as langgraph_app  # The compiled LangGraph StateGraph
 
 # ---------------------------------------------------------------------------
 # Module-level logger
@@ -55,14 +55,13 @@ _LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "podcast-agent")
 # SERVICE FUNCTION
 # ---------------------------------------------------------------------------
 
+
 @traceable(
     # `name` is the display label for this function's trace in LangSmith UI.
     name="run_podcast_agent",
-
     # `tags` appear as coloured labels on the trace in LangSmith.
     # Useful for filtering runs (e.g. filter by "langgraph" or "production").
     tags=["langgraph", "podcast-pipeline", _ENVIRONMENT],
-
     # `metadata` is a flat dict of key/value pairs stored with every trace.
     # These are static values that don't change per request.
     # Per-request dynamic metadata (query, max_generations) is added below
@@ -77,7 +76,9 @@ _LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "podcast-agent")
         "vector_store": "chromadb",
     },
 )
-def run_podcast_agent(query: str, max_generations: int = 3, source_filter: str = None) -> PodcastResponse:
+def run_podcast_agent(
+    query: str, max_generations: int = 3, source_filter: str = None
+) -> PodcastResponse:
     """
     Orchestrates the full Blog-to-Podcast LangGraph pipeline for a given query.
 
@@ -127,9 +128,7 @@ def run_podcast_agent(query: str, max_generations: int = 3, source_filter: str =
         "source_filter": source_filter,  # None means search all sources
     }
 
-    logger.info(
-        "Graph started | query=%r | max_generations=%d", query, max_generations
-    )
+    logger.info("Graph started | query=%r | max_generations=%d", query, max_generations)
 
     # -----------------------------------------------------------------------
     # STEP 2: Build RunnableConfig with rich LangSmith metadata
@@ -149,7 +148,6 @@ def run_podcast_agent(query: str, max_generations: int = 3, source_filter: str =
         # run_name becomes the title of the LangGraph run in LangSmith.
         # Using the query makes it easy to identify runs at a glance.
         run_name=f"Podcast | {query[:60]}",
-
         # tags are searchable labels — good for filtering in LangSmith UI.
         # e.g. you can filter all runs tagged "max_gen_3" or "development".
         tags=[
@@ -157,7 +155,6 @@ def run_podcast_agent(query: str, max_generations: int = 3, source_filter: str =
             _ENVIRONMENT,
             f"max_gen_{max_generations}",
         ],
-
         # metadata is the richest part — every key/value here appears in
         # LangSmith under the "Metadata" tab and is fully searchable.
         metadata={
@@ -166,12 +163,11 @@ def run_podcast_agent(query: str, max_generations: int = 3, source_filter: str =
             "version": _APP_VERSION,
             "environment": _ENVIRONMENT,
             "model_name": "llama-3.1-8b-instant",
-
             # ── Per-request dynamic metadata ─────────────────────────────
             # These values change with every request, giving you full
             # observability into exactly what each run was processing.
-            "podcast_topic": query,           # What the user asked for
-            "user_query": query,              # Same as above, aliased for clarity
+            "podcast_topic": query,  # What the user asked for
+            "user_query": query,  # Same as above, aliased for clarity
             "max_generations": max_generations,  # Retry budget for this run
         },
     )
@@ -188,9 +184,7 @@ def run_podcast_agent(query: str, max_generations: int = 3, source_filter: str =
     except Exception as exc:
         logger.exception("Graph execution failed | query=%r | error=%s", query, exc)
         # RuntimeError is caught by routes.py and returned as HTTP 500
-        raise RuntimeError(
-            f"The LangGraph pipeline encountered an error: {exc}"
-        ) from exc
+        raise RuntimeError(f"The LangGraph pipeline encountered an error: {exc}") from exc
 
     logger.info(
         "Graph finished | query=%r | generation_count=%d | accepted=%s",
