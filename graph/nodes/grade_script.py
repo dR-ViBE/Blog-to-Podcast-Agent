@@ -1,15 +1,17 @@
 # graph/nodes/grade_script.py
 #
-# LANGSMITH INTEGRATION:
-#   Same pattern as generate_podcast_script.py — we accept the propagated
-#   RunnableConfig from LangGraph and forward it (with extra grading-specific
-#   metadata) to the script_grader chain call.
+# UPGRADE: Now reads the triadic Editor action (accept / revise_script / request_more_context)
+# and writes the appropriate routing fields back to state.
 #
-#   In LangSmith this produces:
-#     graph run
-#       └── grade_script (node)
-#             └── ChatPromptTemplate + ChatGroq (structured output) + GradeScript
-#                 ← all tagged with "grade-script" and current generation count
+# KEY CHANGE:
+#   Before: returned {"is_acceptable": bool, "script_evaluation": str}
+#   After:  returns  {"is_acceptable": bool,       # still kept for backward compat
+#                     "editor_action": str,         # the actual 3-way routing key
+#                     "editor_notes": str,          # detailed notes for writer/retriever
+#                     "context_gaps": Optional[str] # for Retriever if request_more_context
+#                    }
+#
+# The decide_next_step conditional reads "editor_action" to route the graph.
 
 from typing import Dict
 
@@ -21,25 +23,24 @@ from graph.state import GraphState
 
 def grade_script(state: GraphState, config: RunnableConfig = None) -> Dict:
     """
-    LangGraph node: Grades the generated podcast script for quality.
+    LangGraph node: Editor Agent — grades the script and decides what happens next.
 
-    Uses a structured-output LLM chain (script_grader) to evaluate whether
-    the script meets length, structure, format, and tone requirements.
+    Three possible decisions (set in editor_action):
+      - "accept"               → decide_next_step routes to GENERATE_AUDIO
+      - "revise_script"        → decide_next_step routes to SUGGEST_IMPROVEMENTS
+      - "request_more_context" → decide_next_step routes back to RETRIEVE
 
     Args:
-        state:  Current LangGraph state. Contains "script" and "generation_count".
-        config: RunnableConfig propagated by LangGraph. Carries LangSmith
-                metadata from services.py.
+        state:  Contains "script" and "generation_count".
+        config: RunnableConfig for LangSmith tracing.
 
     Returns:
-        Dict with "is_acceptable" (bool) and "script_evaluation" (str) fields.
+        Dict with editor_action, editor_notes, context_gaps, is_acceptable,
+        and script_evaluation fields.
     """
     script = state.get("script", "")
     generation_count = state.get("generation_count", 0)
 
-    # -----------------------------------------------------------------------
-    # BUILD NODE-SPECIFIC CONFIG FOR LANGSMITH
-    # -----------------------------------------------------------------------
     parent_metadata = config.get("metadata", {}) if config else {}
 
     node_config = RunnableConfig(
@@ -49,16 +50,20 @@ def grade_script(state: GraphState, config: RunnableConfig = None) -> Dict:
             **parent_metadata,
             "current_node": "grade_script",
             "generation_attempt": generation_count,
-            "script_length_chars": len(script),  # Useful for debugging quality issues
-            # Word count approximation — helpful for understanding grader decisions
+            "script_length_chars": len(script),
             "script_word_count_approx": len(script.split()) if script else 0,
         },
     )
 
-    # Invoke the grader chain, forwarding the enriched config
     result = script_grader.invoke({"script": script}, config=node_config)
 
     return {
-        "is_acceptable": result.is_acceptable,
-        "script_evaluation": result.reason,
+        # Primary routing field — decide_next_step reads this
+        "editor_action": result.action,
+        "editor_notes": result.notes,
+        "context_gaps": result.context_gaps,  # populated only for request_more_context
+
+        # Kept for backward compatibility with existing state fields and tests
+        "is_acceptable": result.action == "accept",
+        "script_evaluation": result.notes,
     }

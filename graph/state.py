@@ -5,69 +5,61 @@
 #   Every node reads from and writes to this state. LangGraph merges
 #   each node's return dict into this shared state automatically.
 #
-# WHY TypedDict:
-#   LangGraph uses TypedDict (not a Pydantic model) for state because:
-#     - It's a plain dict at runtime — fast and JSON-serializable
-#     - Type annotations are for developer tooling, not runtime validation
-#     - LangGraph nodes return partial dicts that are merged into state
-#
 # MULTI-AGENT DATA FLOW:
-#   Planner  → reads "query",                            writes "episode_outline"
+#   Planner  → reads "query",                                    writes "episode_outline"
 #   Retrieve → reads "query" + "episode_outline"
-#              + "source_filter",                        writes "documents" + "retrieval_strategy"
+#              + "source_filter" + "context_gaps",               writes "documents" + "retrieval_strategy"
 #   Writer   → reads "documents" + "episode_outline"
-#              + "improvement_suggestions",              writes "script"
-#   Grader   → reads "script",                           writes "is_acceptable" + "script_evaluation"
-#   Editor   → reads "script" + "script_evaluation",    writes "improvement_suggestions"
-#   Audio    → reads "script",                           writes "audio_output"
+#              + "improvement_suggestions",                       writes "script"
+#   Grader   → reads "script",                                   writes "editor_action" + "editor_notes"
+#                                                                        + "context_gaps" + "is_acceptable"
+#   Editor   → reads "script" + "editor_notes",                  writes "improvement_suggestions"
+#   Audio    → reads "script",                                   writes "audio_output"
 
 from typing import List, Optional
-
-from langchain_core.documents import Document
 from typing_extensions import TypedDict
+from langchain_core.documents import Document
 
 
 class GraphState(TypedDict):
     """
     The shared state for the Blog-to-Podcast LangGraph pipeline.
 
-    Each field represents a piece of data that flows between agents (nodes).
-    Nodes only write the fields they own — LangGraph merges the partial
-    dict into the full state automatically.
-
     Attributes:
-        url:                        The blog URL (set during ingestion, not runtime).
-        query:                      The user's search query (e.g., "AI Agents").
-        source_filter:              Optional source URL/path to scope ChromaDB retrieval.
-                                    When set, only chunks from that source are searched.
-                                    Enables metadata filtering for multi-source databases.
-        documents:                  Retrieved blog chunks from ChromaDB.
-        episode_outline:            Structured plan produced by the Planner Agent.
-                                    Stored as a dict (from EpisodeOutline.model_dump()).
-        retrieval_strategy:         The Retriever's multi-query strategy as a dict.
-        script:                     The generated podcast script text.
-        is_acceptable:              Whether the grader accepted the script.
-        script_evaluation:          The grader's textual reasoning.
-        improvement_suggestions:    Editor's feedback for rejected scripts.
-        editor_action:              Editor Agent decision ("accept" or "revision").
-        editor_notes:               Editor Agent detailed feedback notes.
-        generation_count:           Current script generation attempt number.
-        max_generations:            Maximum allowed generation attempts.
-        audio_output:               File path to the generated MP3 audio.
+        url:                    The blog URL (ingestion reference, not runtime).
+        query:                  The user's search query (e.g., "AI Agents").
+        source_filter:          Optional source URL/path to scope ChromaDB retrieval.
+                                When set, only chunks from that source are searched.
+        documents:              Retrieved blog chunks (populated by Retriever Agent).
+        episode_outline:        Structured plan produced by the Planner Agent (dict).
+        retrieval_strategy:     The Retriever's tool-use summary (tools used, doc counts).
+        script:                 The generated podcast script text.
+        is_acceptable:          Whether the Editor accepted the script (backward compat).
+        script_evaluation:      The Editor's textual feedback (backward compat).
+        editor_action:          Triadic routing decision: "accept" | "revise_script"
+                                | "request_more_context".
+        editor_notes:           Detailed Editor notes for the Writer or Retriever.
+        context_gaps:           Specific topics/concepts the Retriever must search for,
+                                populated only when editor_action == "request_more_context".
+        improvement_suggestions: Writer instructions from the Improvements node.
+        generation_count:       Current script generation attempt number.
+        max_generations:        Maximum allowed generation attempts.
+        audio_output:           File path to the generated MP3 audio.
     """
 
     url: str
     query: str
-    source_filter: Optional[str]  # NEW: optional ChromaDB where-filter by source
+    source_filter: Optional[str]           # Phase 1: optional ChromaDB metadata filter
     documents: List[Document]
-    episode_outline: Optional[dict]  # Planner Agent output
-    retrieval_strategy: Optional[dict]  # Retriever strategy output
+    episode_outline: Optional[dict]         # Planner Agent output
+    retrieval_strategy: Optional[dict]      # Retriever Agent tool-use summary
     script: str
-    is_acceptable: bool
-    script_evaluation: str
+    is_acceptable: bool                     # Backward compat: True iff editor_action == "accept"
+    script_evaluation: str                  # Backward compat: same as editor_notes
+    editor_action: Optional[str]            # Phase 2: triadic routing ("accept" | "revise_script" | "request_more_context")
+    editor_notes: Optional[str]             # Phase 2: detailed Editor feedback
+    context_gaps: Optional[str]             # Phase 2: topics for Retriever when request_more_context
     improvement_suggestions: str
-    editor_action: Optional[str]  # Editor Agent decision (accept/revision)
-    editor_notes: Optional[str]  # Editor Agent detailed feedback
     generation_count: int
     max_generations: int
     audio_output: str

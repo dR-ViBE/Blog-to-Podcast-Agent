@@ -90,6 +90,7 @@ workflow.add_conditional_edges(
     {
         GENERATE_AUDIO: GENERATE_AUDIO,
         SUGGEST_IMPROVEMENTS: SUGGEST_IMPROVEMENTS,
+        RETRIEVE: RETRIEVE,
         END: END,
     },
 )
