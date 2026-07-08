@@ -96,9 +96,9 @@ class EpisodeOutline(BaseModel):
 
     key_talking_points: List[TalkingPoint] = Field(
         min_length=3,  # At least 3 sections for substance
-        max_length=5,  # At most 5 sections to stay within 3-5 minutes
+        max_length=6,  # At most 6 sections to stay within 3-5 minutes
         description=(
-            "An ordered list of 3-5 talking points that form the body of the episode. "
+            "An ordered list of 3-6 talking points that form the body of the episode. "
             "Each point covers one key idea from the source material. "
             "The writer MUST follow this order."
         ),
