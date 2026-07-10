@@ -61,6 +61,45 @@ def health_check() -> HealthResponse:
 
 
 # ---------------------------------------------------------------------------
+# ANALYTICS ENDPOINT (Exposes raw metrics parsed as structured JSON)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/analytics",
+    summary="Get Observability Analytics",
+    description="Collects and returns all registered custom 'podcast_' metrics as structured JSON.",
+    tags=["Utility"],
+)
+def get_analytics():
+    """
+    Scrapes the local prometheus registry and returns the values of all custom
+    metrics starting with 'podcast_' as a structured JSON object.
+    
+    This allows non-technical users to view metrics as a beautiful dashboard
+    in our Streamlit frontend, without requiring a separate Grafana/Prometheus setup.
+    """
+    from prometheus_client import REGISTRY
+
+    data = {}
+    for metric in REGISTRY.collect():
+        if metric.name.startswith("podcast_"):
+            samples = []
+            for sample in metric.samples:
+                samples.append({
+                    "name": sample.name,
+                    "labels": sample.labels,
+                    "value": sample.value
+                })
+            data[metric.name] = {
+                "documentation": metric.documentation,
+                "type": metric.type,
+                "samples": samples
+            }
+    return data
+
+
+# ---------------------------------------------------------------------------
 # GENERATE PODCAST
 # ---------------------------------------------------------------------------
 

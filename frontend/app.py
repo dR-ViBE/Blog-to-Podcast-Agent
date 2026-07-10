@@ -15,7 +15,7 @@ import os
 import streamlit as st
 
 # Import our API helper functions from utils.py
-from utils import check_api_health, fetch_audio_bytes, make_podcast_request, make_ingest_request, fetch_prometheus_metrics
+from utils import check_api_health, fetch_audio_bytes, make_podcast_request, make_ingest_request, fetch_analytics
 
 # ---------------------------------------------------------------------------
 # ENVIRONMENT CONFIGURATION
@@ -384,14 +384,224 @@ def render_results(api_base_url: str):
 # ---------------------------------------------------------------------------
 # MAIN APP
 # ---------------------------------------------------------------------------
+def render_dashboard(api_base_url: str):
+    """
+    Renders a beautiful, interactive observability and analytics dashboard.
+    Fetches live metrics from FastAPI's /analytics endpoint and displays
+    them using premium visual widgets suited for non-developers.
+    """
+    st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+    st.markdown("## 📊 Observability & System Analytics")
+    st.markdown(
+        "A real-time dashboard displaying system performance, costs, quality grades, "
+        "and security events parsed from the underlying Prometheus registry."
+    )
+
+    # --- Fetch Live Metrics ---
+    with st.spinner("Fetching system metrics..."):
+        res = fetch_analytics(api_base_url)
+
+    if not res["success"]:
+        st.error(
+            f"❌ Unable to connect to the Analytics endpoint.\n\n"
+            f"Please make sure the FastAPI backend is running: `{res['error']}`"
+        )
+        return
+
+    metrics_data = res["data"]
+
+    # ── Helper function to extract metric values from registry ──────────────────
+    def get_val(metric_name: str, label_filters: dict = None) -> float:
+        if metric_name not in metrics_data:
+            return 0.0
+        samples = metrics_data[metric_name].get("samples", [])
+        if not samples:
+            return 0.0
+        if label_filters:
+            for s in samples:
+                # Check if all filters match the sample's labels
+                if all(s.get("labels", {}).get(k) == v for k, v in label_filters.items()):
+                    return float(s.get("value", 0.0))
+            return 0.0
+        # If no filters, return the sum of all sample values (excluding metadata samples like _created)
+        return sum(float(s.get("value", 0.0)) for s in samples if not s.get("name", "").endswith("_created"))
+
+    # ── 1. AGGREGATE KEY METRICS ───────────────────────────────────────────────
+    # Requests
+    req_success = get_val("podcast_requests", {"status": "success"})
+    req_no_audio = get_val("podcast_requests", {"status": "no_audio"})
+    req_failed = get_val("podcast_requests", {"status": "failed"})
+    total_requests = req_success + req_no_audio + req_failed
+
+    success_rate = (req_success / total_requests * 100) if total_requests > 0 else 100.0
+
+    # Active Runs
+    active_runs = int(get_val("podcast_active_pipeline_runs"))
+
+    # Cost
+    total_cost_usd = get_val("podcast_llm_cost_usd", {"model": "llama-3.1-8b-instant"})
+
+    # Tokens
+    prompt_tokens = int(get_val("podcast_tokens_used", {"model": "llama-3.1-8b-instant", "token_type": "prompt"}))
+    comp_tokens = int(get_val("podcast_tokens_used", {"model": "llama-3.1-8b-instant", "token_type": "completion"}))
+    total_tokens = prompt_tokens + comp_tokens
+
+    # Quality attempts
+    first_attempt_ok = get_val("podcast_scripts_accepted", {"first_attempt": "True"})
+    revised_attempt_ok = get_val("podcast_scripts_accepted", {"first_attempt": "False"})
+    total_accepted = first_attempt_ok + revised_attempt_ok
+    first_try_rate = (first_attempt_ok / total_accepted * 100) if total_accepted > 0 else 100.0
+
+    # Security
+    injections_blocked = int(get_val("podcast_injection_attempts", {"reason": "pattern_match"}))
+    pii_detections = int(get_val("podcast_pii_detections"))
+    pii_leaks_prevented = int(get_val("podcast_pii_output_detections"))
+
+    # Ingestion
+    ingested_pdf = get_val("podcast_ingestion_chunks", {"source_type": "pdf"})
+    ingested_url = get_val("podcast_ingestion_chunks", {"source_type": "url"})
+    ingested_txt = get_val("podcast_ingestion_chunks", {"source_type": "text"})
+    total_chunks = ingested_pdf + ingested_url + ingested_txt
+
+    # Tool calls
+    tool_vector = get_val("podcast_retrieval_tool_calls", {"tool": "search_vectorstore"})
+    tool_web = get_val("podcast_retrieval_tool_calls", {"tool": "search_web"})
+
+    # ── 2. METRIC CARDS ROW ───────────────────────────────────────────────────
+    st.markdown("### 📈 System Status & Performance")
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric(
+            label="Total Requests Run",
+            value=int(total_requests),
+            delta=f"{int(req_failed)} failed",
+            delta_color="inverse",
+        )
+    with col2:
+        st.metric(
+            label="Pipeline Success Rate",
+            value=f"{success_rate:.1f}%",
+            delta="Target: >90%",
+            delta_color="off",
+        )
+    with col3:
+        st.metric(
+            label="Active In-Flight runs",
+            value=active_runs,
+            delta="Idle" if active_runs == 0 else "Processing",
+            delta_color="normal",
+        )
+    with col4:
+        st.metric(
+            label="Total LLM Cost (USD)",
+            value=f"${total_cost_usd:.5f}",
+            delta=f"{total_tokens:,} tokens",
+            delta_color="off",
+        )
+
+    # ── 3. COLUMNS: QUALITY vs SECURITY ───────────────────────────────────────
+    st.markdown("---")
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+        st.markdown("### 🎨 Content Quality & Pacing")
+        
+        # Quality score evaluation
+        st.write("**First-Attempt Acceptance Rate**")
+        st.caption("Percentage of scripts that pass the Senior Editor on the first try without revisions.")
+        st.progress(first_try_rate / 100.0)
+        
+        quality_rating = "🟢 GOOD" if first_try_rate >= 70 else ("🟡 FAIR" if first_try_rate >= 40 else "🔴 POOR")
+        st.write(f"Current Rating: **{quality_rating}** ({first_try_rate:.1f}%)")
+        
+        st.markdown("""
+        **Pacing Value Analysis:**
+        * **First-try rate > 70%:** Planner and Writer are highly aligned. Generates scripts in under 30 seconds.
+        * **First-try rate < 50%:** Editor rejects drafts frequently. Leads to multiple retry iterations, increasing cost.
+        """)
+
+        st.markdown("**Knowledge Base Composition**")
+        st.caption("Distribution of chunks stored in ChromaDB vector database by document source type:")
+        
+        kb_data = {
+            "PDF Files": ingested_pdf,
+            "Web URLs crawled": ingested_url,
+            "Plain Text / Markdown": ingested_txt
+        }
+        for kb_type, count in kb_data.items():
+            st.write(f"- **{kb_type}**: {int(count)} chunks")
+        st.write(f"Total Database Size: **{int(total_chunks)} chunks**")
+
+    with right_col:
+        st.markdown("### 🛡️ Guardrails & Safety Auditing")
+        
+        # Status indicators
+        sec_col1, sec_col2 = st.columns(2)
+        with sec_col1:
+            st.markdown(
+                f"""
+                <div class="result-card" style="text-align: center;">
+                    <div class="metric-label" style="font-size: 0.75rem;">Prompt Injections Blocked</div>
+                    <div class="metric-value" style="font-size: 2.2rem; color: #f87171;">🚫 {injections_blocked}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with sec_col2:
+            st.markdown(
+                f"""
+                <div class="result-card" style="text-align: center;">
+                    <div class="metric-label" style="font-size: 0.75rem;">PII Entities Masked</div>
+                    <div class="metric-value" style="font-size: 2.2rem; color: #fbbf24;">🔒 {pii_detections}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(f"**PII Leaks Prevented in Outputs:** `{pii_leaks_prevented}` warnings raised")
+
+        st.markdown("""
+        **Security Metric Ranges & Rules:**
+        * **Injections Blocked:** Any value above 0 shows active defense in action. The PromptInjectionGuard blocks base64, DAN, role-play escape, and prompt extraction patterns.
+        * **PII Entities Masked:** Scans input for PERSON, EMAIL, Phone, Credit Card, SSN. Ensures compliance with privacy standards by masking before LLM submission.
+        """)
+
+    # ── 4. RETRIEVAL STRATEGY ─────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 🔍 Agent Tool Selection")
+    st.caption("Tracks how the Retriever Agent selects tools based on the Planner's outline needs:")
+    
+    tool_col1, tool_col2 = st.columns(2)
+    with tool_col1:
+        st.markdown(
+            f"""
+            <div class="result-card" style="border-left: 5px solid #667eea;">
+                <div class="metric-label">Local Vector Store Searches</div>
+                <div class="metric-value">📚 {int(tool_vector)} searches</div>
+                <div style="font-size: 0.8rem; color:#888; margin-top: 0.5rem;">Primary retrieval tool. Always queried first.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with tool_col2:
+        st.markdown(
+            f"""
+            <div class="result-card" style="border-left: 5px solid #764ba2;">
+                <div class="metric-label">Live Web fallback searches</div>
+                <div class="metric-value">🌐 {int(tool_web)} searches</div>
+                <div style="font-size: 0.8rem; color:#888; margin-top: 0.5rem;">Called when vector results are sparse or recent facts are missing.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def main():
     """
     The main function that assembles and renders the entire Streamlit app.
-
-    Streamlit re-runs this function every time the user interacts with the UI.
-    The order of calls here determines the visual order on the page.
+    Now supports Navigation Tabs (Generator vs Analytics Dashboard).
     """
-
     # 1. Initialise session state (safe to call on every re-run)
     init_session_state()
 
@@ -408,10 +618,11 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # ── TABS NAVIGATION ──────────────────────────────────────────────────────
-    tab_app, tab_dash = st.tabs(["🎙️ Podcast Generator", "📊 Diagnostics & System Metrics"])
+    # Create top-level tabs
+    tab_generator, tab_dashboard = st.tabs(["🎙️ Podcast Generator", "📊 Analytics & Observability"])
 
-    with tab_app:
+    # ── Tab 1: Podcast Generator ───────────────────────────────────────────
+    with tab_generator:
         # ── INGESTION EXPANDER ───────────────────────────────────────────────
         with st.expander("📂 Ingest Source Documents (PDF / Text / URL)", expanded=True):
             st.markdown(
@@ -419,9 +630,9 @@ def main():
                 "it in the database before generating a podcast."
             )
 
-            tab_ing1, tab_ing2 = st.tabs(["📄 Upload File (PDF/Text)", "🔗 Crawl URL"])
+            tab1, tab2 = st.tabs(["📄 Upload File (PDF/Text)", "🔗 Crawl URL"])
 
-            with tab_ing1:
+            with tab1:
                 uploaded_file = st.file_uploader(
                     "Upload a PDF or TXT document",
                     type=["pdf", "txt", "md"],
@@ -449,7 +660,7 @@ def main():
                     else:
                         st.warning("⚠️ Please select a file to upload first.")
 
-            with tab_ing2:
+            with tab2:
                 url_to_ingest = st.text_input(
                     "Enter URL to crawl",
                     placeholder="https://example.com/blog-post",
@@ -606,240 +817,9 @@ def main():
                 unsafe_allow_html=True,
             )
 
-    with tab_dash:
-        st.markdown("## 📊 Diagnostics & System Metrics")
-        st.markdown(
-            "This dashboard aggregates system metrics and evaluation scores directly from the FastAPI "
-            "Prometheus registry and offline RAGAS evaluation results. It provides visual insights for non-developers."
-        )
-        st.markdown("---")
-
-        metrics = fetch_prometheus_metrics(api_base_url)
-
-        if not metrics.get("success", True):
-            st.error(f"❌ Could not load metrics: {metrics.get('error')}")
-            st.info("Ensure the FastAPI server is running and `ENABLE_METRICS=true` is set in your `.env`.")
-        else:
-            # ── ROW 1: KEY PERFORMANCE INDICATORS ─────────────────────────────────
-            col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
-
-            # Active Pipeline runs
-            active = int(metrics.get("active_runs", 0))
-            active_color = "🟢 Idle" if active == 0 else f"🟡 {active} In-Flight"
-            with col_kpi1:
-                st.markdown(
-                    f"""
-                    <div class="result-card" style="text-align: center;">
-                        <div class="metric-label">Pipeline Status</div>
-                        <div class="metric-value" style="font-size: 1.5rem; font-weight: 700; color: #764ba2;">{active_color}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            # Total requests (Success rate calculation)
-            reqs = metrics.get("requests", {})
-            total_reqs = sum(reqs.values())
-            success_rate = (reqs.get("success", 0) / total_reqs * 100) if total_reqs > 0 else 100.0
-            with col_kpi2:
-                st.markdown(
-                    f"""
-                    <div class="result-card" style="text-align: center;">
-                        <div class="metric-label">Total Runs (Success %)</div>
-                        <div class="metric-value" style="font-size: 1.5rem; font-weight: 700; color: #4ade80;">
-                            {int(total_reqs)} ({success_rate:.1f}%)
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            # Total cost
-            cost = metrics.get("cost_usd", 0.0)
-            with col_kpi3:
-                st.markdown(
-                    f"""
-                    <div class="result-card" style="text-align: center;">
-                        <div class="metric-label">Total LLM Cost</div>
-                        <div class="metric-value" style="font-size: 1.5rem; font-weight: 700; color: #ffb703;">
-                            ${cost:.6f}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            # Total tokens
-            tokens = metrics.get("tokens", {})
-            total_toks = sum(tokens.values())
-            with col_kpi4:
-                st.markdown(
-                    f"""
-                    <div class="result-card" style="text-align: center;">
-                        <div class="metric-label">Total LLM Tokens</div>
-                        <div class="metric-value" style="font-size: 1.5rem; font-weight: 700; color: #667eea;">
-                            {int(total_toks):,}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            # ── ROW 2: VISUAL CHART METRICS ───────────────────────────────────────
-            st.markdown("### 📈 Pipeline Execution & Tools")
-            col_ch1, col_ch2 = st.columns(2)
-
-            with col_ch1:
-                st.markdown("**🔄 Agent Generation Decisions**")
-                gen_data = metrics.get("generation_attempts", {})
-                st.bar_chart(gen_data)
-                st.caption("Distribution of outcomes during the script generation loop.")
-
-            with col_ch2:
-                st.markdown("**🔍 Retriever Agent Tool Calls**")
-                tool_data = metrics.get("tool_calls", {})
-                st.bar_chart(tool_data)
-                st.caption("How many times the Retriever Agent queried the vector store vs calling live Web search.")
-
-            # ── ROW 3: PRIVACY & SECURITY EVENTS ──────────────────────────────────
-            st.markdown("### 🛡️ Privacy & Security Activity Logs")
-            col_sec1, col_sec2 = st.columns(2)
-
-            with col_sec1:
-                pii_data = metrics.get("pii_detections", {})
-                total_pii = sum(pii_data.values())
-                st.markdown(f"**🔒 PII Queries Anonymized: `{int(total_pii)}`**")
-                if pii_data:
-                    st.bar_chart(pii_data)
-                    st.caption("Types of personal data (names, emails, etc.) masked in query inputs.")
-                else:
-                    st.success("No personal data detected in user inputs yet.")
-
-            with col_sec2:
-                injections = int(metrics.get("injection_attempts", 0))
-                st.markdown(f"**🚫 Blocked Attacks & Jailbreaks: `{injections}`**")
-                if injections > 0:
-                    st.warning(f"⚠️ Security Guard blocked {injections} prompt injection attempts.")
-                    st.caption("Check API logs for query SHA-256 hashes to analyze target payloads.")
-                else:
-                    st.success("No prompt injection or jailbreak attempts detected.")
-
-            # ── ROW 4: RAGAS QUALITY EVALUATION RESULTS ───────────────────────────
-            st.markdown("### 🧪 Quantitative RAGAS Evaluation Results")
-            st.markdown(
-                "Below are the results of the RAGAS offline evaluation suite run against the Golden Query Dataset. "
-                "These metrics rate both our Retrieval precision and output Faithfulness."
-            )
-
-            # Try loading RAGAS results from JSON
-            ragas_data = None
-            ragas_path = Path("tests/eval/ragas_results.json")
-            if ragas_path.exists():
-                try:
-                    with open(ragas_path) as rf:
-                        ragas_data = json.load(rf)
-                except Exception:
-                    pass
-
-            if ragas_data:
-                scores = ragas_data.get("summary_scores", {})
-                eval_time = ragas_data.get("evaluation_timestamp", "")
-                if eval_time:
-                    # Clean timestamp
-                    eval_time = eval_time.split("T")[0]
-
-                st.caption(f"Last evaluated on: **{eval_time}** | Golden dataset queries: **{ragas_data.get('num_queries', 8)}**")
-
-                col_r1, col_r2, col_r3 = st.columns(3)
-                col_r4, col_r5, col_r6 = st.columns(3)
-
-                # Context Precision
-                cp = scores.get("context_precision")
-                with col_r1:
-                    st.metric(
-                        label="Context Precision (Target: > 0.75)",
-                        value=f"{cp:.4f}" if cp is not None else "N/A",
-                        delta="Good" if cp and cp >= 0.75 else "Needs Ingestion" if cp else None,
-                        delta_color="normal" if cp and cp >= 0.75 else "inverse"
-                    )
-
-                # Context Recall
-                cr = scores.get("context_recall")
-                with col_r2:
-                    st.metric(
-                        label="Context Recall (Target: > 0.70)",
-                        value=f"{cr:.4f}" if cr is not None else "N/A",
-                        delta="Good" if cr and cr >= 0.70 else "Needs Ingestion" if cr else None,
-                        delta_color="normal" if cr and cr >= 0.70 else "inverse"
-                    )
-
-                # Context Entity Recall
-                cer = scores.get("context_entity_recall")
-                with col_r3:
-                    st.metric(
-                        label="Context Entity Recall (Target: > 0.60)",
-                        value=f"{cer:.4f}" if cer is not None else "N/A",
-                        delta="Good" if cer and cer >= 0.60 else "Low Coverage" if cer else None,
-                        delta_color="normal" if cer and cer >= 0.60 else "inverse"
-                    )
-
-                # Answer Relevancy
-                ar = scores.get("answer_relevancy")
-                with col_r4:
-                    st.metric(
-                        label="Answer Relevancy (Target: > 0.80)",
-                        value=f"{ar:.4f}" if ar is not None else "N/A",
-                        delta="Good" if ar and ar >= 0.80 else "Tune Prompts" if ar else None,
-                        delta_color="normal" if ar and ar >= 0.80 else "inverse"
-                    )
-
-                # Faithfulness
-                faith = scores.get("faithfulness")
-                with col_r5:
-                    st.metric(
-                        label="Faithfulness (Target: > 0.75)",
-                        value=f"{faith:.4f}" if faith is not None else "N/A",
-                        delta="No Hallucinations" if faith and faith >= 0.75 else "Hallucination Risk" if faith else None,
-                        delta_color="normal" if faith and faith >= 0.75 else "inverse"
-                    )
-
-                # Noise Sensitivity
-                ns = scores.get("noise_sensitivity")
-                with col_r6:
-                    # Lower is better
-                    st.metric(
-                        label="Noise Sensitivity (Target: < 0.30)",
-                        value=f"{ns:.4f}" if ns is not None else "N/A",
-                        delta="Robust" if ns and ns <= 0.30 else "Fragile" if ns else None,
-                        delta_color="normal" if ns and ns <= 0.30 else "inverse"
-                    )
-            else:
-                st.warning("⚠️ RAGAS evaluation results file `tests/eval/ragas_results.json` was not found.")
-                st.info("Run the evaluation suite in your terminal to calculate and display these metrics: `poetry run python -m tests.eval.ragas_eval`")
-
-            # ── ROW 5: CORPUS ANALYSIS ──────────────────────────────────────────
-            st.markdown("### 📁 Knowledge Base Ingested Corpus")
-            col_corp1, col_corp2 = st.columns([1, 2])
-
-            with col_corp1:
-                st.markdown("**Ingested Document Types**")
-                ing_data = metrics.get("ingested_chunks", {})
-                st.caption("Distribution of parsed vector store chunks by their source type.")
-                st.bar_chart(ing_data)
-
-            with col_corp2:
-                st.markdown("**Metric Value Interpretation Guide**")
-                st.markdown(
-                    """
-                    | Metric Name | Normal Range | Meaning | Status |
-                    |---|---|---|---|
-                    | **Pipeline Status** | `Idle` (0 active) | No users generating scripts. | ✅ normal |
-                    | **Success %** | `> 90%` | Ratio of successful audio creations vs failures. | ✅ healthy |
-                    | **Avg Cost / Run** | `< $0.01` | Average Groq LLaMA 3.1 token cost per execution. | ✅ ultra-low |
-                    | **PII Queries** | `N/A` | Total input queries that had personal details masked. | 🔒 secure |
-                    | **Blocked Attacks** | `0` | Total blocked SQL/prompt injection payloads. | 🛡️ secure |
-                    """
-                )
+    # ── Tab 2: Observability Dashboard ──────────────────────────────────────
+    with tab_dashboard:
+        render_dashboard(api_base_url)
 
 
 # ---------------------------------------------------------------------------
@@ -847,7 +827,5 @@ def main():
 # ---------------------------------------------------------------------------
 # Streamlit runs the entire script on every interaction, so we call main()
 # directly at the bottom (no `if __name__ == "__main__"` guard needed).
-import json
-from pathlib import Path
 main()
 

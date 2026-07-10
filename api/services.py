@@ -161,7 +161,6 @@ def run_podcast_agent(
     except Exception as exc:
         # Record failed request in Prometheus
         METRICS.requests_total.labels(status="failed").inc()
-        METRICS.active_pipeline_runs.dec()
         logger.exception("Graph execution failed | query=%r | error=%s", query, exc)
         raise RuntimeError(f"The LangGraph pipeline encountered an error: {exc}") from exc
     finally:
