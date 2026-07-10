@@ -62,17 +62,17 @@ Your job is to gather ALL the information needed to produce an excellent podcast
 You have been given an episode outline that tells you exactly what information is needed.
 
 STRATEGY:
-1. Read the episode outline carefully. Identify the key concepts, examples, and talking points.
-2. Use search_vectorstore to find relevant content for each key concept.
-   Make multiple targeted queries — one per concept is better than one broad query.
-3. If the vector store results are sparse or missing key information, use search_web as a supplement.
-4. Keep searching until you have solid content for ALL the talking points in the outline.
+1. Read the episode outline carefully. Identify the key concepts and talking points.
+2. Use search_vectorstore to find relevant content. Be highly efficient. Make 1 or 2 targeted queries at most.
+3. Only use search_web if local vectorstore results are completely empty or missing crucial facts.
+4. Stop searching immediately once you have a basic overview of the talking points. Do not perform excessive searches.
 
 RULES:
 - Always try search_vectorstore first.
 - Only use search_web if local results are clearly insufficient.
-- Stop when you have enough content to cover all talking points in the outline.
-- Do not search for the same thing twice with the same query.
+- Minimize tool calls: do not call tools more than 2 times total.
+- Stop when you have enough content to cover the outline points.
+- Do not search for the same thing twice.
 """
 
 _retriever_agent = create_react_agent(
@@ -189,7 +189,7 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
         pairs = [[query, doc.page_content] for doc in unique_docs]
         scores = model.predict(pairs)
         scored = sorted(zip(unique_docs, scores), key=lambda x: x[1], reverse=True)
-        final_docs = [doc for doc, _ in scored[:8]]  # top 8 (agent may gather more)
+        final_docs = [doc for doc, _ in scored[:4]]  # top 4 (reduces context size to fit Groq 6000 TPM limit)
 
     # ── Build retrieval strategy summary for state/LangSmith ──────────────────
     tool_calls_made = [

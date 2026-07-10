@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chroma Chunks Viewer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #f5f7fb; color: #111827; }
+    h1 { margin-bottom: 8px; }
+    .summary { margin-bottom: 20px; color: #4b5563; }
+    .chunk-card { background: white; border: 1px solid #d1d5db; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .chunk-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .chunk-id { font-size: 12px; color: #6b7280; word-break: break-all; }
+    .meta { margin: 10px 0; font-size: 13px; color: #374151; white-space: pre-wrap; }
+    .content { white-space: pre-wrap; line-height: 1.5; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #f9fafb; padding: 8px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Chroma Chunks Viewer</h1>
+  <div class="summary">Collection: blog_podcast_agent | Total chunks: 9</div>
+  
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 1</h3>
+                <div class="chunk-id">5dfb359a-77fc-4c7d-ae52-98f18ab11004</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> <br>
+                <strong>Metadata:</strong><pre>{
+  "creator": "LaTeX with hyperref",
+  "author": "",
+  "keywords": "",
+  "trapped": "/False",
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "subject": "",
+  "page": 0,
+  "source_type": "pdf",
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "title": "",
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1",
+  "total_pages": 2,
+  "producer": "pdfTeX-1.40.27",
+  "page_label": ""
+}</pre>
+              </div>
+              <div class="content">–
+Diffusion-Based Trajectory Planning for Excavators with Learned
+Dynamics Models
+Sugheerth Sreedharan, Christo Aluckal, Pavan Yarlagadda, Ganesh Prabakaran, Rugved
+Raote, Shouvik Das, Karthik Dantu
+{SUGHEERT,CHRISTOA,PAVANYAR,GANESHPR,RUGVEDRI,SDAS28,KDANTU}@BUFFALO.EDU
+University at Buffalo
+Abstract
+Diffusion-based trajectory planners have shown remarkable ability to generate diverse, conditioned
+trajectories for robotic systems, yet they typically rely on a low-level controller to translate state-
+derivative commands into control inputs. For complex machines like hydraulic excavators, the low
+level controller design and collecting extensive hardware demonstration pose significant challenges.
+In this work, we collapse the plan-then-track paradigm into a single framework that generates state
+trajectories jointly with the control signals required to execute them. We leverage learned dynamics
+models to simulate large-scale demonstration datasets and to enforce dynamic coherence during
+generation, eliminating the need for both analytical modeling and costly real-world data collection,
+bridging the gap between diffusion based planning and tracking control learning.
+Keywords:Trajectory generation, learned dynamics, diffusion, planning, control
+1. Introduction</div>
+            </section>
+            
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 2</h3>
+                <div class="chunk-id">3003d239-b402-492e-8028-3f1118737cb6</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> <br>
+                <strong>Metadata:</strong><pre>{
+  "title": "",
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "keywords": "",
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1",
+  "subject": "",
+  "creator": "LaTeX with hyperref",
+  "total_pages": 2,
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "source_type": "pdf",
+  "producer": "pdfTeX-1.40.27",
+  "page": 0,
+  "page_label": "",
+  "author": "",
+  "trapped": "/False"
+}</pre>
+              </div>
+              <div class="content">bridging the gap between diffusion based planning and tracking control learning.
+Keywords:Trajectory generation, learned dynamics, diffusion, planning, control
+1. Introduction
+Excavators are complex hydraulic machines whose dynamics are highly machine-specific, nonlin-
+ear, and difficult to model analytically. Collecting demonstrations on physical hardware is intensive,
+since an operator must simultaneously coordinate multiple links (boom, arm, bucket) in a coupled
+hydraulic system. Traditional approaches separate plan generation from tracking control: a planner
+produces a desired state trajectory, and a separate controller maps it to actuator commands. Recent
+developments in trajectory generation using diffusion models are capable of generating trajectories
+that adhere to certain conditions and costs (Janner et al., 2022; Carvalho et al., 2023). In this work,
+we aim to develop a trajectory generation pipeline using demonstrations simulated with the learned
+dynamics of the excavator.
+2. Methods and Contributions
+Learned Forward and Inverse Dynamics.Inspired by prior work on dynamics modeling (Spinelli
+et al., 2024), we train four LSTM models over a rolling history of joint angles, joint velocities,
+control inputs, and pressures for the boom, arm, and bucket: (1)Induced Pressure Predictor</div>
+            </section>
+            
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 3</h3>
+                <div class="chunk-id">2637cced-21b9-4d13-bfe6-1552d2c34387</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> <br>
+                <strong>Metadata:</strong><pre>{
+  "title": "",
+  "page_label": "",
+  "trapped": "/False",
+  "source_type": "pdf",
+  "producer": "pdfTeX-1.40.27",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "creator": "LaTeX with hyperref",
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "author": "",
+  "total_pages": 2,
+  "page": 0,
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1",
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "keywords": "",
+  "subject": ""
+}</pre>
+              </div>
+              <div class="content">et al., 2024), we train four LSTM models over a rolling history of joint angles, joint velocities,
+control inputs, and pressures for the boom, arm, and bucket: (1)Induced Pressure Predictor
+((histt−9:t−1, ut)→ˆpt), (2)Induced V elocity Predictor((histt−9:t−1, ut,ˆpt)→ ˆ˙qt), (3)Required
+Pressure Predictor((histt−9:t−1,˙q ∗
+t )→p ∗
+t ) and (4)Required Control Predictor
+((histt−9:t−1,˙q ∗
+t , p∗
+t )→u ∗
+t )
+Simulation and Dataset Generation:We build a Gazebo simulation integrating the learned mod-
+els with the excavator URDF. Given a reference plan in joint angles and velocities, the inverse
+models predict the required pressure and control inputs while the forward models predict induced
+pressure and velocity. The full state-action trajectory (joint angles, velocities, pressures, and valve
+commands) is logged, enabling scalable dataset generation without real hardware.</div>
+            </section>
+            
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 4</h3>
+                <div class="chunk-id">82ee7f1f-9a3b-4798-bca8-58aef8c7c09a</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> <br>
+                <strong>Metadata:</strong><pre>{
+  "page_label": "",
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "total_pages": 2,
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1",
+  "author": "",
+  "subject": "",
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "keywords": "",
+  "title": "",
+  "creator": "LaTeX with hyperref",
+  "page": 0,
+  "trapped": "/False",
+  "source_type": "pdf",
+  "producer": "pdfTeX-1.40.27"
+}</pre>
+              </div>
+              <div class="content">pressure and velocity. The full state-action trajectory (joint angles, velocities, pressures, and valve
+commands) is logged, enabling scalable dataset generation without real hardware.
+© S.S.C.A.P.Y .G.P.R.R.S.D.K. Dantu.</div>
+            </section>
+            
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 5</h3>
+                <div class="chunk-id">34fcd8f2-b551-4382-a6cd-49f1267de5ec</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> 1<br>
+                <strong>Metadata:</strong><pre>{
+  "creator": "LaTeX with hyperref",
+  "page": 1,
+  "title": "",
+  "page_label": "",
+  "total_pages": 2,
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "source_type": "pdf",
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1",
+  "subject": "",
+  "author": "",
+  "keywords": "",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "trapped": "/False",
+  "producer": "pdfTeX-1.40.27"
+}</pre>
+              </div>
+              <div class="content">DANTU
+History-Conditioned Diffusion Planner and Reward-Guided Sampling:We formulate a con-
+ditional denoising diffusion process conditioned on the history of past observations, the desired
+start positionq s, and the desired goal positionq g. Each trajectory waypoint comprises joint angles
+q, joint velocities˙q, extend/retract pressurespfor all three joints, and control inputsu. Inspired by
+Diffuser (Janner et al., 2022), we introduce a reward signal that biases sampling toward dynamically
+feasible trajectories. For diffusion stepiand waypointt, the total reward is given by:
+J i
+total =
+TX
+t=1
+−λ1∥˙qi
+t − ˆ˙qt(histt, ui
+t,ˆpt)∥2 −λ 2∥pi
+t −ˆpt(histt, ui
+t)∥2
+The gradient at timestepiand the sampling mean update is given by:
+gi
+t =∇ [ ˙qi
+t,pi
+t,ui
+t]J i
+t
+| {z }
+waypointt
++
+min(10,T−t)X
+k=1
+∇[ ˙qi
+t,pi
+t,ui
+t]J i</div>
+            </section>
+            
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 6</h3>
+                <div class="chunk-id">8e607515-5a90-4a38-bd3e-f27e8990092f</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> 1<br>
+                <strong>Metadata:</strong><pre>{
+  "page_label": "",
+  "title": "",
+  "keywords": "",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "author": "",
+  "page": 1,
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1",
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "total_pages": 2,
+  "trapped": "/False",
+  "subject": "",
+  "creator": "LaTeX with hyperref",
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "source_type": "pdf",
+  "producer": "pdfTeX-1.40.27"
+}</pre>
+              </div>
+              <div class="content">t
+| {z }
+waypointt
++
+min(10,T−t)X
+k=1
+∇[ ˙qi
+t,pi
+t,ui
+t]J i
+t+k
+| {z }
+next history window
+˜µi
+[ ˙qt,pt,ut] =µ i
+θ[ ˙qt,pt,ut] +α·Σ i ·g i
+t
+At every sampling step, start and goal positions are inpainted (Janner et al., 2022).
+3. Preliminary Results
+Dynamics Model Accuracy.Table 1 shows prediction metrics of the learned forward and inverse
+dynamics models. The models closely track the ground-truth joint velocities, pressures and control
+commands across all three joints, validating their use as a simulation backbone.
+Table 1:Comparison of LSTM Metrics and Model Architecture Plan in MoveIt2 Excavator in Gazebo
+Pressure (Fwd)(MPa) Pressure (Inv)(MPa) V el(rad/s)/Cmd
+MAE RMSER 2 MAE RMSER 2 MAE RMSER 2
+arm ext. 0.178 0.461 0.997 arm ext. 0.293 0.717 0.992 dq arm 0.011 0.038 0.965</div>
+            </section>
+            
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 7</h3>
+                <div class="chunk-id">f52d3a91-4a34-4fc8-9056-5477ec76f7b4</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> 1<br>
+                <strong>Metadata:</strong><pre>{
+  "source_type": "pdf",
+  "subject": "",
+  "producer": "pdfTeX-1.40.27",
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "keywords": "",
+  "title": "",
+  "total_pages": 2,
+  "author": "",
+  "creator": "LaTeX with hyperref",
+  "page_label": "",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "page": 1,
+  "trapped": "/False",
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1"
+}</pre>
+              </div>
+              <div class="content">arm ext. 0.178 0.461 0.997 arm ext. 0.293 0.717 0.992 dq arm 0.011 0.038 0.965
+arm ret. 0.263 0.676 0.989 arm ret. 0.317 0.763 0.985 dq boom 0.004 0.014 0.949
+boom ext. 0.126 0.344 0.993 boom ext. 0.259 0.631 0.980 dq buck 0.016 0.050 0.972
+boom ret. 0.195 0.640 0.990 boom ret. 0.321 0.739 0.989 marm 0.022 0.067 0.974
+buck ext. 0.116 0.419 0.990 buck ext. 0.116 0.310 0.991 mboom 0.025 0.076 0.949
+buck ret. 0.189 0.445 0.995 buck ret. 0.168 0.530 0.988 mbuck 0.012 0.067 0.924
+Simulation Environment and Planned Trajectory.Figure 1 shows the Gazebo simulation envi-
+ronment and Figure 1 the excavator URDF and a trajectory planned in MoveIt.
+Discussion:Moving forward, our efforts are focused on generating multi-link articulated demon-</div>
+            </section>
+            
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 8</h3>
+                <div class="chunk-id">5f26493b-78eb-4cfb-8a8c-fc5a554d1938</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> 1<br>
+                <strong>Metadata:</strong><pre>{
+  "title": "",
+  "source_type": "pdf",
+  "producer": "pdfTeX-1.40.27",
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1",
+  "trapped": "/False",
+  "page_label": "",
+  "author": "",
+  "page": 1,
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "keywords": "",
+  "subject": "",
+  "creator": "LaTeX with hyperref",
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "total_pages": 2
+}</pre>
+              </div>
+              <div class="content">ronment and Figure 1 the excavator URDF and a trajectory planned in MoveIt.
+Discussion:Moving forward, our efforts are focused on generating multi-link articulated demon-
+strations to build the dataset. This data will be used to train a diffusion model conditioned on
+historical embeddings to capture the initial dynamics of the system. The model will then be used to
+iteratively sample trajectories via reward-guided ODE sampling and execute the initial control until
+the target is reached.
+References
+Jo˜ao Carvalho, An T. Le, Mark Baierl, Dorothea Koert, and Jan Peters. Motion planning diffusion: Learning
+and planning of robot motions with diffusion models. In2023 IEEE/RSJ International Conference on In-
+telligent Robots and Systems (IROS), pages 1916–1923, 2023. doi: 10.1109/IROS55552.2023.10342382.
+Michael Janner, Yilun Du, Joshua Tenenbaum, and Sergey Levine. Planning with diffusion for flexible
+behavior synthesis. 05 2022. doi: 10.48550/arXiv.2205.09991.
+Filippo Spinelli, Pascal Egli, Fang Nan, Thilo Bleumer, Patrick Goegler, Stephan Brockes, Ferdinand Hof-
+mann, and Marco Hutter. Reinforcement learning control for autonomous hydraulic material handling ma-</div>
+            </section>
+            
+            <section class="chunk-card">
+              <div class="chunk-header">
+                <h3>Chunk 9</h3>
+                <div class="chunk-id">7a77a2e6-833a-4b3f-84a3-76b0ac36a75a</div>
+              </div>
+              <div class="meta">
+                <strong>Source:</strong> D:\Podcast_Agent\outputs\uploads\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf<br>
+                <strong>Page:</strong> 1<br>
+                <strong>Metadata:</strong><pre>{
+  "source": "D:\\Podcast_Agent\\outputs\\uploads\\L4DC_Diffusion_Based_Trajectory_Planning_for_Excavators_with_Learned_Dynamics_Models-2 (1).pdf",
+  "producer": "pdfTeX-1.40.27",
+  "total_pages": 2,
+  "trapped": "/False",
+  "author": "",
+  "page_label": "",
+  "creator": "LaTeX with hyperref",
+  "title": "",
+  "subject": "",
+  "creationdate": "2026-04-01T03:24:38+00:00",
+  "keywords": "",
+  "page": 1,
+  "source_type": "pdf",
+  "moddate": "2026-04-01T03:24:38+00:00",
+  "ptex.fullbanner": "This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) kpathsea version 6.4.1"
+}</pre>
+              </div>
+              <div class="content">Filippo Spinelli, Pascal Egli, Fang Nan, Thilo Bleumer, Patrick Goegler, Stephan Brockes, Ferdinand Hof-
+mann, and Marco Hutter. Reinforcement learning control for autonomous hydraulic material handling ma-
+chines with underactuated tools. pages 12694–12701, 10 2024. doi: 10.1109/IROS58592.2024.10802199.</div>
+            </section>
+            
+</body>
+</html>

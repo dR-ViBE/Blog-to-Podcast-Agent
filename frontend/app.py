@@ -15,7 +15,7 @@ import os
 import streamlit as st
 
 # Import our API helper functions from utils.py
-from utils import check_api_health, fetch_audio_bytes, make_podcast_request
+from utils import check_api_health, fetch_audio_bytes, make_podcast_request, make_ingest_request
 
 # ---------------------------------------------------------------------------
 # ENVIRONMENT CONFIGURATION
@@ -156,6 +156,7 @@ def init_session_state():
         "audio_filename": None,  # Stores the MP3 filename for the download button
         "is_loading": False,  # True while the API call is in progress
         "error_message": None,  # Stores an error string to display, if any
+        "ingested_source": None, # Stores the source URL or file path after ingestion
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -403,9 +404,70 @@ def main():
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<p class="hero-subtitle">Convert blog content into an AI-generated podcast — powered by LangGraph, Groq & ElevenLabs.</p>',
+        '<p class="hero-subtitle">Convert blog posts, PDFs, or live web content into an AI-generated podcast — powered by LangGraph, Groq & ElevenLabs.</p>',
         unsafe_allow_html=True,
     )
+
+    # ── INGESTION EXPANDER (NEW) ───────────────────────────────────────────
+    with st.expander("📂 Ingest Source Documents (PDF / Text / URL)", expanded=True):
+        st.markdown(
+            "Upload a document (like a PDF resume, markdown notes) or crawl a URL to store "
+            "it in the database before generating a podcast."
+        )
+
+        tab1, tab2 = st.tabs(["📄 Upload File (PDF/Text)", "🔗 Crawl URL"])
+
+        with tab1:
+            uploaded_file = st.file_uploader(
+                "Upload a PDF or TXT document",
+                type=["pdf", "txt", "md"],
+                key="doc_uploader",
+                label_visibility="collapsed"
+            )
+
+            if st.button("🚀 Ingest Document", key="ingest_doc_btn", use_container_width=True):
+                if uploaded_file is not None:
+                    with st.spinner("Ingesting and embedding document..."):
+                        file_bytes = uploaded_file.read()
+                        res = make_ingest_request(
+                            api_base_url,
+                            file_data=(uploaded_file.name, file_bytes)
+                        )
+                    if res["success"]:
+                        st.session_state["ingested_source"] = res["data"].get("source")
+                        st.success(
+                            f"✅ Successfully ingested {res['data'].get('chunks')} chunks "
+                            f"from PDF: {uploaded_file.name}!\n\n"
+                            f"Source path set: `{res['data'].get('source')}`"
+                        )
+                    else:
+                        st.error(f"❌ Ingestion failed: {res['error']}")
+                else:
+                    st.warning("⚠️ Please select a file to upload first.")
+
+        with tab2:
+            url_to_ingest = st.text_input(
+                "Enter URL to crawl",
+                placeholder="https://example.com/blog-post",
+                key="url_ingest_input",
+                label_visibility="collapsed"
+            )
+
+            if st.button("🚀 Ingest URL", key="ingest_url_btn", use_container_width=True):
+                if url_to_ingest and url_to_ingest.startswith("http"):
+                    with st.spinner("Crawling and ingesting web page..."):
+                        res = make_ingest_request(api_base_url, url_str=url_to_ingest)
+                    if res["success"]:
+                        st.session_state["ingested_source"] = res["data"].get("source")
+                        st.success(
+                            f"✅ Successfully ingested {res['data'].get('chunks')} chunks "
+                            f"from URL: {url_to_ingest}!\n\n"
+                            f"Source filter set: `{res['data'].get('source')}`"
+                        )
+                    else:
+                        st.error(f"❌ Ingestion failed: {res['error']}")
+                else:
+                    st.warning("⚠️ Please enter a valid URL starting with http:// or https://")
 
     # ── INPUT SECTION ──────────────────────────────────────────────────────
     st.markdown("### 🔎 Enter your Query")
@@ -417,9 +479,24 @@ def main():
 
     query = st.text_input(
         label="Query",
-        placeholder="e.g. AI Agents, Prompt Engineering, Machine Learning...",
+        placeholder="e.g. key qualifications, summarize resume, Prompt Engineering...",
         label_visibility="collapsed",
         key="query_input",
+        max_chars=300,
+    )
+
+    st.markdown("### 🎯 Optional: Scope Search by Source (Metadata Filter)")
+    st.caption(
+        "Only search chunks from the specific source URL or file path provided. "
+        "Leave blank to search all ingested sources."
+    )
+    
+    source_filter_val = st.text_input(
+        label="Source Filter",
+        value=st.session_state["ingested_source"] if st.session_state["ingested_source"] else "",
+        placeholder="e.g. outputs/uploads/my_resume.pdf or https://lilianweng.github.io",
+        label_visibility="collapsed",
+        key="source_filter_input",
         max_chars=300,
     )
 
@@ -476,6 +553,7 @@ def main():
                 base_url=api_base_url,
                 query=query.strip(),
                 max_generations=max_generations,
+                source_filter=source_filter_val.strip() if source_filter_val else None,
             )
 
             if api_result["success"]:

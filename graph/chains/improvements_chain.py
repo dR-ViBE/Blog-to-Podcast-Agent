@@ -1,28 +1,23 @@
+# graph/chains/improvements_chain.py
+#
+# PROMPT VERSIONING: System prompt loaded from graph/prompts/improvements_v{N}.txt
+# Controlled by IMPROVEMENTS_PROMPT_VERSION env var (default: v1).
+
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 
+from graph.prompts.loader import load_prompt, get_prompt_version
+
 llm = ChatGroq(model="llama-3.1-8b-instant")
 
-system = """You are a Senior Podcast Editor with 20 years of experience in radio and audio storytelling. 
-You are reviewing a draft script that has been flagged for issues.
-
-Your goal is to provide **concrete instructions** to the writer on how to fix the script based on the specific problems identified.
-
-**YOUR INSTRUCTIONS:**
-1.  **Analyze the Input:** Look at the "Rejection Reason" and the "Draft Script".
-2.  **Be Direct & Actionable:** Do not be polite or vague. Use imperative commands (e.g., "Cut this," "Move that," "Sharpen the hook").
-3.  **No Rewriting:** Do not write the script yourself. Your job is to guide the writer, not do their job.
-4.  **No Grading:** Do not give a score or a generic compliment.
-5.  **Tone:** Professional, curt, and efficient. Sound like a busy editor leaving sticky notes on a manuscript.
-
-**FORMAT:**
-Provide a bulleted points of 3-5 specific changes the writer must make to satisfy the rejection criteria.
-"""
+# ─── Load Versioned Prompt ───────────────────────────────────────────────────
+_IMPROVEMENTS_VERSION = get_prompt_version("improvements")
+_system = load_prompt("improvements", _IMPROVEMENTS_VERSION)
 
 improvement_prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", system),
+        ("system", _system),
         ("human", "REJECTED SCRIPT: {script}\n\nREJECTION REASON:{script_evaluation}"),
     ]
 )

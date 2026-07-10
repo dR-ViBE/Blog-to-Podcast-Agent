@@ -30,6 +30,7 @@ USAGE:
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
@@ -100,6 +101,7 @@ def _load_from_url(url: str) -> List[Document]:
                     "source": page.get("url", url),
                     "source_type": "url",
                     "title": page.get("title", ""),
+                    "ingested_at": datetime.now(timezone.utc).isoformat(),
                 },
             )
         )
@@ -122,6 +124,7 @@ def _load_from_pdf(path: str) -> List[Document]:
         doc.metadata["source"] = str(Path(path).resolve())
         doc.metadata["source_type"] = "pdf"
         doc.metadata.setdefault("title", Path(path).stem)
+        doc.metadata["ingested_at"] = datetime.now(timezone.utc).isoformat()
 
     print(f"  [PDF] Loaded {len(docs)} pages.")
     return docs
@@ -140,6 +143,7 @@ def _load_from_text(path: str) -> List[Document]:
         doc.metadata["source"] = str(Path(path).resolve())
         doc.metadata["source_type"] = "text"
         doc.metadata.setdefault("title", Path(path).stem)
+        doc.metadata["ingested_at"] = datetime.now(timezone.utc).isoformat()
 
     print(f"  [TEXT] Loaded {len(docs)} document(s).")
     return docs

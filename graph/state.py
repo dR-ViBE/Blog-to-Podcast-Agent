@@ -30,6 +30,8 @@ class GraphState(TypedDict):
         query:                  The user's search query (e.g., "AI Agents").
         source_filter:          Optional source URL/path to scope ChromaDB retrieval.
                                 When set, only chunks from that source are searched.
+        source_type_filter:     Optional source type filter ("url"|"pdf"|"text").
+                                Scopes ChromaDB retrieval to a specific content type.
         documents:              Retrieved blog chunks (populated by Retriever Agent).
         episode_outline:        Structured plan produced by the Planner Agent (dict).
         retrieval_strategy:     The Retriever's tool-use summary (tools used, doc counts).
@@ -45,11 +47,16 @@ class GraphState(TypedDict):
         generation_count:       Current script generation attempt number.
         max_generations:        Maximum allowed generation attempts.
         audio_output:           File path to the generated MP3 audio.
+        llm_cost_usd:           Cumulative estimated LLM cost in USD for this run.
+        total_tokens_used:      Cumulative estimated token count (prompt + completion).
+        pii_was_masked:         True if PII was detected and masked in the input query.
+        pii_entities_found:     List of PII entity types detected in input (e.g. ["PERSON"]).
     """
 
     url: str
     query: str
-    source_filter: Optional[str]           # Phase 1: optional ChromaDB metadata filter
+    source_filter: Optional[str]           # Phase 1: optional ChromaDB source URL/path filter
+    source_type_filter: Optional[str]      # Phase 1: optional source type filter (url/pdf/text)
     documents: List[Document]
     episode_outline: Optional[dict]         # Planner Agent output
     retrieval_strategy: Optional[dict]      # Retriever Agent tool-use summary
@@ -63,3 +70,9 @@ class GraphState(TypedDict):
     generation_count: int
     max_generations: int
     audio_output: str
+    # ── Cost & Token Tracking (Phase 1) ──────────────────────────────────────
+    llm_cost_usd: float                     # Cumulative estimated USD cost for this run
+    total_tokens_used: int                  # Cumulative estimated token count (prompt + completion)
+    # ── PII Tracking (Phase 1) ───────────────────────────────────────────────
+    pii_was_masked: bool                    # True if query PII was masked before graph invocation
+    pii_entities_found: List[str]           # Entity types masked (e.g. ["PERSON", "EMAIL_ADDRESS"])

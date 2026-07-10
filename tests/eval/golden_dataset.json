@@ -1,45 +1,68 @@
 {
-  "description": "Golden dataset for RAGAS evaluation of the Blog-to-Podcast RAG pipeline. Each entry represents a (query, ground_truth_context_topics) pair used to measure retrieval quality.",
+  "description": "Golden dataset for RAGAS evaluation — Blog-to-Podcast Agent RAG pipeline. Expanded from 3 to 8 queries for more statistically robust metric averages. Covers factual retrieval, conceptual understanding, multi-hop reasoning, and comparison queries.",
   "dataset": [
     {
-      "query": "What is prompt engineering and why does it matter?",
+      "query": "What is the main goal of the diffusion-based trajectory planner for excavators proposed in the paper?",
       "ground_truths": [
-        "Prompt engineering is the process of designing and refining prompts to guide language model outputs effectively.",
-        "Well-crafted prompts can dramatically improve the quality and relevance of LLM responses.",
-        "Prompt engineering techniques include few-shot prompting, chain-of-thought reasoning, and role prompting."
-      ]
+        "The paper proposes a framework that collapses the plan-then-track paradigm into a single framework.",
+        "It generates state trajectories jointly with the control signals required to execute them for hydraulic excavators."
+      ],
+      "query_type": "factual"
     },
     {
-      "query": "Explain chain-of-thought prompting",
+      "query": "How does the proposed excavator planning framework eliminate the need for analytical modeling and costly real-world data collection?",
       "ground_truths": [
-        "Chain-of-thought prompting encourages the model to show its reasoning step by step before giving a final answer.",
-        "CoT prompting significantly improves performance on reasoning and math tasks.",
-        "Few-shot chain-of-thought examples demonstrate the step-by-step reasoning format to the model."
-      ]
+        "The framework leverages learned dynamics models to simulate large-scale demonstration datasets and to enforce dynamic coherence during generation."
+      ],
+      "query_type": "factual"
     },
     {
-      "query": "What are the best strategies for few-shot prompting?",
+      "query": "What are the challenges associated with using traditional trajectory planners on complex hydraulic excavators?",
       "ground_truths": [
-        "Few-shot prompting provides the model with a small number of input-output examples to demonstrate the desired task.",
-        "The quality and diversity of the examples significantly impacts model performance.",
-        "Examples should be representative of the task and formatted consistently."
-      ]
+        "Hydraulic excavators are complex machines where low-level controller design and collecting extensive hardware demonstrations pose significant challenges.",
+        "Their dynamics are highly machine-specific, nonlinear, and difficult to model analytically."
+      ],
+      "query_type": "conceptual"
     },
     {
-      "query": "How does temperature and sampling affect LLM outputs?",
+      "query": "What is an AI agent and how does it differ from a regular LLM call?",
       "ground_truths": [
-        "Temperature controls the randomness of LLM outputs — higher temperature produces more creative, diverse outputs.",
-        "Greedy decoding always picks the highest probability token, while sampling introduces randomness.",
-        "Top-p and top-k sampling are common strategies to balance creativity and coherence."
-      ]
+        "An AI agent is an autonomous system that can perceive its environment, make decisions, and take actions to achieve a goal.",
+        "Unlike a single LLM call which just generates text, an agent can use tools, maintain memory, and execute multi-step plans."
+      ],
+      "query_type": "conceptual"
     },
     {
-      "query": "What are instruction-tuned models and how do they differ from base models?",
+      "query": "What is prompt engineering and what are some effective techniques?",
       "ground_truths": [
-        "Instruction-tuned models are fine-tuned on examples of instructions and responses to follow user directions better.",
-        "Base models predict the next token without being optimized for instruction following.",
-        "RLHF (Reinforcement Learning from Human Feedback) is commonly used to align models with human preferences."
-      ]
+        "Prompt engineering is the practice of designing inputs to LLMs to elicit desired outputs.",
+        "Effective techniques include chain-of-thought prompting, few-shot examples, role assignment, and output format specification."
+      ],
+      "query_type": "conceptual"
+    },
+    {
+      "query": "How does retrieval-augmented generation (RAG) reduce hallucination in language models?",
+      "ground_truths": [
+        "RAG reduces hallucination by grounding LLM responses in retrieved factual documents rather than relying solely on parametric knowledge.",
+        "The model is constrained to generate answers consistent with the retrieved context, making fabrication of facts less likely."
+      ],
+      "query_type": "conceptual"
+    },
+    {
+      "query": "What is the role of embeddings in a vector database and why are they better than keyword search?",
+      "ground_truths": [
+        "Embeddings are dense numerical representations of text that capture semantic meaning.",
+        "Vector search using embeddings finds semantically similar content even when exact keywords don't match, outperforming keyword search for meaning-based retrieval."
+      ],
+      "query_type": "comparison"
+    },
+    {
+      "query": "What is LangGraph and what problem does it solve over basic LangChain chains?",
+      "ground_truths": [
+        "LangGraph is a framework for building stateful, multi-agent workflows using a directed graph of nodes.",
+        "It solves the problem of building complex pipelines with conditional routing, loops, and shared state that are difficult to express in linear LangChain chains."
+      ],
+      "query_type": "comparison"
     }
   ]
 }

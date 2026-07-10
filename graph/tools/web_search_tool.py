@@ -31,7 +31,7 @@ from langchain_tavily import TavilySearch
 
 # Initialise once at module load — not inside the function, to avoid
 # re-creating the client on every tool call.
-_tavily_search = TavilySearch(max_results=4)
+_tavily_search = TavilySearch(max_results=2)
 
 
 @tool

@@ -15,7 +15,7 @@ import requests  # The library used to make HTTP requests to the FastAPI backend
 # They are simple and work well with Streamlit's session_state system.
 
 
-def make_podcast_request(base_url: str, query: str, max_generations: int) -> dict:
+def make_podcast_request(base_url: str, query: str, max_generations: int, source_filter: str = None) -> dict:
     """
     Sends a POST request to the FastAPI /podcast endpoint.
 
@@ -28,6 +28,7 @@ def make_podcast_request(base_url: str, query: str, max_generations: int) -> dic
         query:           The topic the user typed in (e.g. "AI Agents").
         max_generations: Max number of times the agent will try to improve
                          the script before giving up.
+        source_filter:   Optional source path/URL to filter retrieval.
 
     Returns:
         dict with keys:
@@ -42,6 +43,8 @@ def make_podcast_request(base_url: str, query: str, max_generations: int) -> dic
         "query": query,
         "max_generations": max_generations,
     }
+    if source_filter:
+        payload["source_filter"] = source_filter
 
     try:
         # timeout=300 seconds (5 minutes) — LangGraph can take a while
@@ -110,6 +113,39 @@ def make_podcast_request(base_url: str, query: str, max_generations: int) -> dic
             "success": False,
             "error": f"⚠️ Unexpected error: {exc}",
         }
+
+
+def make_ingest_request(base_url: str, file_data: tuple = None, url_str: str = None) -> dict:
+    """
+    Sends a POST request to the FastAPI /ingest endpoint.
+
+    Args:
+        base_url:  The base URL of the FastAPI server.
+        file_data: A tuple of (filename, file_bytes) to upload.
+        url_str:   A URL string to crawl and ingest.
+
+    Returns:
+        dict with success (bool), data (dict), and error (str).
+    """
+    api_url = f"{base_url.rstrip('/')}/ingest"
+
+    try:
+        if file_data:
+            filename, file_bytes = file_data
+            files = {"file": (filename, file_bytes, "application/pdf" if filename.endswith(".pdf") else "text/plain")}
+            response = requests.post(api_url, files=files, timeout=120)
+        elif url_str:
+            data = {"url": url_str}
+            response = requests.post(api_url, data=data, timeout=120)
+        else:
+            return {"success": False, "error": "Provide either file_data or url_str."}
+
+        response.raise_for_status()
+        return {"success": True, "data": response.json()}
+
+    except Exception as exc:
+        return {"success": False, "error": f"Ingestion request failed: {exc}"}
+
 
 
 def fetch_audio_bytes(base_url: str, filename: str) -> dict:

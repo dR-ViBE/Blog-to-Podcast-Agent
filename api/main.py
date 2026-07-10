@@ -19,6 +19,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # langsmith is imported here only for the startup health check.
 # It does NOT need to be called explicitly anywhere else —
@@ -197,6 +198,31 @@ app.add_middleware(
 # The prefix="" means routes are served at the root: /health, /podcast, etc.
 # ---------------------------------------------------------------------------
 app.include_router(router, prefix="")
+
+
+# ---------------------------------------------------------------------------
+# PROMETHEUS METRICS ENDPOINT
+#
+# /metrics is the standard Prometheus scrape endpoint. Prometheus (or any
+# compatible scraper) polls this URL periodically to collect all metric values.
+#
+# HOW IT WORKS:
+#   - prometheus_fastapi_instrumentator auto-instruments all FastAPI routes
+#     (http_request_duration_seconds, http_requests_total, etc.)
+#   - Our custom metrics (api/metrics.py) are also exposed here automatically
+#     because they are registered in the same prometheus_client registry.
+#
+# USAGE:
+#   curl http://localhost:8000/metrics
+#   → Returns all metrics in Prometheus text exposition format
+# ---------------------------------------------------------------------------
+Instrumentator(
+    should_group_status_codes=True,  # Group 2xx/4xx/5xx instead of per-code
+    should_ignore_untemplated=True,   # Ignore unknown routes (reduces cardinality)
+    should_respect_env_var=True,      # Disable via ENABLE_METRICS=false if needed
+    env_var_name="ENABLE_METRICS",
+    excluded_handlers=["/metrics", "/health"],  # Don't instrument the metrics endpoint itself
+).instrument(app).expose(app, endpoint="/metrics", tags=["Observability"])
 
 
 # ---------------------------------------------------------------------------
