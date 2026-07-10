@@ -213,3 +213,95 @@ def check_api_health(base_url: str) -> bool:
         return response.status_code == 200
     except Exception:
         return False
+
+
+def fetch_prometheus_metrics(base_url: str) -> dict:
+    """
+    Fetches raw text metrics from GET /metrics and parses them into a structured dict.
+    This enables rendering a premium, native admin dashboard inside the Streamlit UI,
+    providing non-developers with a friendly visual interface.
+
+    Returns:
+        dict: Parsed metrics summary.
+    """
+    url = f"{base_url.rstrip('/')}/metrics"
+    metrics_summary = {
+        "success": True,
+        "active_runs": 0.0,
+        "requests": {"success": 0.0, "failed": 0.0, "no_audio": 0.0},
+        "cost_usd": 0.0,
+        "tokens": {"prompt": 0.0, "completion": 0.0},
+        "pii_detections": {},
+        "injection_attempts": 0.0,
+        "generation_attempts": {"accepted": 0.0, "rejected_revise": 0.0, "rejected_context": 0.0, "max_reached": 0.0},
+        "tool_calls": {"search_vectorstore": 0.0, "search_web": 0.0},
+        "ingested_chunks": {"url": 0.0, "pdf": 0.0, "text": 0.0, "directory": 0.0},
+    }
+
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        text = response.text
+
+        # Parse line-by-line
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            # Split into name/labels and value
+            parts = line.rsplit(maxsplit=1)
+            if len(parts) != 2:
+                continue
+
+            metric_spec, val_str = parts
+            try:
+                val = float(val_str)
+            except ValueError:
+                continue
+
+            # Clean name and parse labels
+            if "{" in metric_spec:
+                name, label_part = metric_spec.split("{", 1)
+                label_part = label_part.rstrip("}")
+                # Parse labels like k="v",k2="v2"
+                labels = {}
+                for item in label_part.split(","):
+                    if "=" in item:
+                        k, v = item.split("=", 1)
+                        labels[k.strip()] = v.strip().strip('"')
+            else:
+                name = metric_spec
+                labels = {}
+
+            # Populate metrics summary dict
+            if name == "podcast_active_pipeline_runs":
+                metrics_summary["active_runs"] = val
+            elif name == "podcast_requests_total":
+                status = labels.get("status", "success")
+                metrics_summary["requests"][status] = val
+            elif name == "podcast_llm_cost_usd_total":
+                metrics_summary["cost_usd"] += val
+            elif name == "podcast_tokens_used_total":
+                t_type = labels.get("token_type", "prompt")
+                metrics_summary["tokens"][t_type] = val
+            elif name == "podcast_pii_detections_total":
+                entity = labels.get("entity_type", "unknown")
+                metrics_summary["pii_detections"][entity] = val
+            elif name == "podcast_injection_attempts_total":
+                metrics_summary["injection_attempts"] += val
+            elif name == "podcast_generation_attempts_total":
+                res = labels.get("result", "accepted")
+                metrics_summary["generation_attempts"][res] = val
+            elif name == "podcast_retrieval_tool_calls_total":
+                tool = labels.get("tool", "search_vectorstore")
+                metrics_summary["tool_calls"][tool] = val
+            elif name == "podcast_ingestion_chunks_total":
+                s_type = labels.get("source_type", "text")
+                metrics_summary["ingested_chunks"][s_type] = val
+
+        return metrics_summary
+
+    except Exception as exc:
+        return {"success": False, "error": f"Failed to retrieve metrics: {exc}"}
+
