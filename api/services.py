@@ -21,6 +21,7 @@ from typing import List, Optional
 
 from langchain_core.runnables import RunnableConfig
 from langsmith import traceable
+import mlflow
 
 from api.metrics import METRICS
 from api.models import FilterOptions, PodcastResponse
@@ -29,6 +30,12 @@ from graph.graph import app as langgraph_app
 from graph.prompts.loader import get_all_active_versions
 
 logger = logging.getLogger(__name__)
+
+# Initialize MLflow experiment locally (logs to ./mlruns)
+try:
+    mlflow.set_experiment("Blog-to-Podcast-Agent")
+except Exception as _exc:
+    logger.warning("Failed to initialize MLflow tracking: %s. Proceeding without MLflow.", _exc)
 
 AUDIO_OUTPUT_DIR = Path("outputs/audio")
 
@@ -155,13 +162,41 @@ def run_podcast_agent(
         },
     )
 
+    # ── MLflow Run Tracking ───────────────────────────────────────────────────
+    mlflow_run = None
+    try:
+        mlflow_run = mlflow.start_run(run_name=f"Podcast | {query[:40]}")
+        mlflow.log_param("query", query)
+        mlflow.log_param("max_generations", max_generations)
+        mlflow.log_param("model_name", _LLM_MODEL)
+        mlflow.log_param("source_filter", resolved_source_filter or "None")
+        mlflow.log_param("source_type_filter", resolved_source_type_filter or "None")
+        mlflow.log_param("pii_was_masked", pii_was_masked)
+        # Log active prompt versions
+        for prompt_name, version in prompt_versions.items():
+            mlflow.log_param(f"prompt_version_{prompt_name}", version)
+    except Exception as mlflow_init_exc:
+        logger.warning("Failed to start MLflow run: %s", mlflow_init_exc)
+
     # ── Invoke the LangGraph app ──────────────────────────────────────────────
     try:
         final_state: dict = langgraph_app.invoke(initial_state, config=run_config)
+        if mlflow_run:
+            try:
+                mlflow.log_param("status", "success")
+            except Exception:
+                pass
     except Exception as exc:
         # Record failed request in Prometheus
         METRICS.requests_total.labels(status="failed").inc()
         logger.exception("Graph execution failed | query=%r | error=%s", query, exc)
+        if mlflow_run:
+            try:
+                mlflow.log_param("status", "failed")
+                mlflow.log_param("error_message", str(exc))
+                mlflow.end_run()
+            except Exception:
+                pass
         raise RuntimeError(f"The LangGraph pipeline encountered an error: {exc}") from exc
     finally:
         # Always record duration (even on failure)
@@ -230,6 +265,31 @@ def run_podcast_agent(
         total_tokens_used,
         elapsed,
     )
+
+    # ── Log Successful Run to MLflow ──────────────────────────────────────────
+    if mlflow_run:
+        try:
+            mlflow.log_metric("elapsed_seconds", elapsed)
+            mlflow.log_metric("total_cost_usd", llm_cost_usd)
+            mlflow.log_metric("total_tokens_used", total_tokens_used)
+            mlflow.log_metric("generation_count", generation_count)
+            mlflow.log_metric("is_acceptable", 1.0 if is_accepted else 0.0)
+            
+            script = final_state.get("script", "")
+            if script:
+                mlflow.log_text(script, "generated_script.txt")
+                mlflow.log_metric("script_word_count", len(script.split()))
+            
+            eval_score = final_state.get("script_evaluation", {}).get("grade_score", 0.0) if final_state.get("script_evaluation") else 0.0
+            mlflow.log_metric("eval_grade_score", float(eval_score or 0.0))
+            
+            mlflow.end_run()
+        except Exception as mlflow_log_exc:
+            logger.warning("Failed to log final run data to MLflow: %s", mlflow_log_exc)
+            try:
+                mlflow.end_run()
+            except Exception:
+                pass
 
     # ── Extract audio path ────────────────────────────────────────────────────
     raw_audio_path: str | None = final_state.get("audio_output")
