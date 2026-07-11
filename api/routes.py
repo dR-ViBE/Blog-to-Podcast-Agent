@@ -100,6 +100,40 @@ def get_analytics():
 
 
 # ---------------------------------------------------------------------------
+# CHROMA CHUNKS HTML VIEW
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/chunks-view",
+    response_class=FileResponse,
+    summary="Get ChromaDB Chunks HTML View",
+    description="Updates and returns a beautiful HTML page listing all ingested document chunks currently in ChromaDB.",
+    tags=["Utility"],
+)
+def get_chunks_view():
+    """
+    Triggers scratch/export_chroma_chunks_html.py to refresh the local HTML view of
+    the vector database, then returns the HTML file to be displayed in the browser.
+    """
+    from scratch.export_chroma_chunks_html import main as export_chunks
+    try:
+        export_chunks()
+    except Exception as exc:
+        logger.error("Failed to export ChromaDB chunks: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate ChromaDB chunks view: {exc}"
+        )
+    
+    html_path = Path("outputs/chroma_chunks_view.html")
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Chroma chunks view HTML file not found.")
+        
+    return FileResponse(html_path)
+
+
+# ---------------------------------------------------------------------------
 # GENERATE PODCAST
 # ---------------------------------------------------------------------------
 

@@ -214,6 +214,13 @@ def render_sidebar() -> tuple[str, int]:
                     "❌ API is offline. Start it with:\n`poetry run uvicorn api.main:app --reload`"
                 )
 
+        st.link_button(
+            "📚 View Chroma Chunks",
+            f"{api_base_url.rstrip('/')}/chunks-view",
+            use_container_width=True,
+            help="Opens a beautiful HTML visualization listing all database text chunks, metadata, and files in a new tab.",
+        )
+
         st.markdown("---")
 
         # --- Max generations slider ---
