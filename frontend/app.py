@@ -453,7 +453,10 @@ def render_dashboard(api_base_url: str):
     first_try_rate = (first_attempt_ok / total_accepted * 100) if total_accepted > 0 else 100.0
 
     # Security
-    injections_blocked = int(get_val("podcast_injection_attempts", {"reason": "pattern_match"}))
+    injections_blocked = int(
+        get_val("podcast_injection_attempts", {"reason": "pattern_match"}) +
+        get_val("podcast_injection_attempts", {"reason": "semantic"})
+    )
     pii_detections = int(get_val("podcast_pii_detections"))
     pii_leaks_prevented = int(get_val("podcast_pii_output_detections"))
 

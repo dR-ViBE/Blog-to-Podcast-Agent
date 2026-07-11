@@ -149,9 +149,10 @@ def generate_podcast(request: PodcastRequest) -> PodcastResponse:
     # This is the first line of defence against OWASP LLM Top 10 #1 risk.
     try:
         check_prompt_injection(request.query)
-    except HTTPException:
+    except HTTPException as exc:
         # Re-raise as-is (already has correct status code and message)
-        METRICS.injection_attempts_total.labels(reason="pattern_match").inc()
+        reason = "semantic" if "semantic policy" in getattr(exc, "detail", "") else "pattern_match"
+        METRICS.injection_attempts_total.labels(reason=reason).inc()
         raise
 
     # ── Security Layer 2: PII Detection & Masking ────────────────────────────
