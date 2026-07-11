@@ -17,6 +17,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Load environment variables before any internal modules are imported
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -33,13 +37,6 @@ except ImportError:
     _LANGSMITH_AVAILABLE = False
 
 from api.routes import router
-
-# ---------------------------------------------------------------------------
-# Load .env before anything else
-# This ensures GROQ_API_KEY, ELEVENLABS_API_KEY, TAVILY_API_KEY, etc. are
-# available as environment variables when the graph modules are imported.
-# ---------------------------------------------------------------------------
-load_dotenv()
 
 
 # ---------------------------------------------------------------------------
