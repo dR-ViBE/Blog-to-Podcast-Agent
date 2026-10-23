@@ -1,0 +1,116 @@
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - podcast_network
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "nomic-embed-text"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - podcast_network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      APP_NAME: blog-to-podcast-agent
+      APP_VERSION: "1.0.0"
+      ENVIRONMENT: production
+      ENABLE_METRICS: "true"
+      LANGCHAIN_TRACING_V2: "false"
+    command:
+      - uvicorn
+      - api.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    volumes:
+      - ./.chroma:/app/.chroma
+      - ./outputs:/app/outputs
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - podcast_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "80:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - podcast_network
+
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - podcast_network
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - podcast_network
+
+volumes:
+  ollama_data:
+    name: podcast_agent_ollama_data
+  prometheus_data:
+  grafana_data:
+
+networks:
+  podcast_network:
+    name: podcast_agent_production_network
