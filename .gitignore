@@ -120,3 +120,16 @@ Thumbs.db
 
 #audio files
 outputs/audio/*.mp3
+
+# MLflow
+mlruns/
+mlflow.db
+
+# Scratch / temp files
+scratch/
+
+# Generated HTML views
+outputs/chroma_chunks_view.html
+
+# Test results
+test_results/

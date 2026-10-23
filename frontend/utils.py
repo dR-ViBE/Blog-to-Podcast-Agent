@@ -8,7 +8,6 @@
 
 import requests  # The library used to make HTTP requests to the FastAPI backend
 
-
 # ---------------------------------------------------------------------------
 # DATA CONTAINERS
 # ---------------------------------------------------------------------------
@@ -16,7 +15,14 @@ import requests  # The library used to make HTTP requests to the FastAPI backend
 # They are simple and work well with Streamlit's session_state system.
 
 
-def make_podcast_request(base_url: str, query: str, max_generations: int) -> dict:
+def make_podcast_request(
+    base_url: str,
+    query: str,
+    max_generations: int,
+    source_filter: str = None,
+    user_id: str = "default_user",
+    web_search_approved: bool = False,
+) -> dict:
     """
     Sends a POST request to the FastAPI /podcast endpoint.
 
@@ -29,12 +35,12 @@ def make_podcast_request(base_url: str, query: str, max_generations: int) -> dic
         query:           The topic the user typed in (e.g. "AI Agents").
         max_generations: Max number of times the agent will try to improve
                          the script before giving up.
+        source_filter:   Optional source path/URL to filter retrieval.
+        user_id:         The unique ID of the user.
+        web_search_approved: True if the user approved fallback web crawling.
 
     Returns:
-        dict with keys:
-            "success" (bool)  — True if the API call worked.
-            "data"    (dict)  — The JSON response body from FastAPI (if success).
-            "error"   (str)   — A human-friendly error message (if failure).
+        dict with success (bool), data (dict), and error (str).
     """
     url = f"{base_url.rstrip('/')}/podcast"
 
@@ -42,7 +48,11 @@ def make_podcast_request(base_url: str, query: str, max_generations: int) -> dic
     payload = {
         "query": query,
         "max_generations": max_generations,
+        "user_id": user_id,
+        "web_search_approved": web_search_approved,
     }
+    if source_filter:
+        payload["source_filter"] = source_filter
 
     try:
         # timeout=300 seconds (5 minutes) — LangGraph can take a while
@@ -113,6 +123,46 @@ def make_podcast_request(base_url: str, query: str, max_generations: int) -> dic
         }
 
 
+def make_ingest_request(
+    base_url: str,
+    file_data: tuple = None,
+    url_str: str = None,
+    user_id: str = "default_user",
+) -> dict:
+    """
+    Sends a POST request to the FastAPI /ingest endpoint.
+
+    Args:
+        base_url:  The base URL of the FastAPI server.
+        file_data: A tuple of (filename, file_bytes) to upload.
+        url_str:   A URL string to crawl and ingest.
+        user_id:   The unique ID of the user.
+
+    Returns:
+        dict with success (bool), data (dict), and error (str).
+    """
+    api_url = f"{base_url.rstrip('/')}/ingest"
+
+    try:
+        if file_data:
+            filename, file_bytes = file_data
+            files = {"file": (filename, file_bytes, "application/pdf" if filename.endswith(".pdf") else "text/plain")}
+            data = {"user_id": user_id}
+            response = requests.post(api_url, files=files, data=data, timeout=120)
+        elif url_str:
+            data = {"url": url_str, "user_id": user_id}
+            response = requests.post(api_url, data=data, timeout=120)
+        else:
+            return {"success": False, "error": "Provide either file_data or url_str."}
+
+        response.raise_for_status()
+        return {"success": True, "data": response.json()}
+
+    except Exception as exc:
+        return {"success": False, "error": f"Ingestion request failed: {exc}"}
+
+
+
 def fetch_audio_bytes(base_url: str, filename: str) -> dict:
     """
     Downloads an MP3 audio file from GET /audio/{filename}.
@@ -178,3 +228,26 @@ def check_api_health(base_url: str) -> bool:
         return response.status_code == 200
     except Exception:
         return False
+
+
+def fetch_analytics(base_url: str) -> dict:
+    """
+    Fetches the structured JSON metrics dictionary from GET /analytics.
+
+    Args:
+        base_url: The base URL of the FastAPI server.
+
+    Returns:
+        dict: The metrics dict if successful, or {"error": "..."} on failure.
+    """
+    try:
+        url = f"{base_url.rstrip('/')}/analytics"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        return {"success": True, "data": response.json()}
+    except Exception as exc:
+        return {
+            "success": False,
+            "error": f"Could not retrieve analytics metrics from backend: {exc}"
+        }
+

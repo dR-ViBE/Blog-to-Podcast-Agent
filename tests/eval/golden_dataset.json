@@ -1,0 +1,68 @@
+{
+  "description": "Golden dataset for RAGAS evaluation — Blog-to-Podcast Agent RAG pipeline. Expanded from 3 to 8 queries for more statistically robust metric averages. Covers factual retrieval, conceptual understanding, multi-hop reasoning, and comparison queries.",
+  "dataset": [
+    {
+      "query": "What is the main goal of the diffusion-based trajectory planner for excavators proposed in the paper?",
+      "ground_truths": [
+        "The paper proposes a framework that collapses the plan-then-track paradigm into a single framework.",
+        "It generates state trajectories jointly with the control signals required to execute them for hydraulic excavators."
+      ],
+      "query_type": "factual"
+    },
+    {
+      "query": "How does the proposed excavator planning framework eliminate the need for analytical modeling and costly real-world data collection?",
+      "ground_truths": [
+        "The framework leverages learned dynamics models to simulate large-scale demonstration datasets and to enforce dynamic coherence during generation."
+      ],
+      "query_type": "factual"
+    },
+    {
+      "query": "What are the challenges associated with using traditional trajectory planners on complex hydraulic excavators?",
+      "ground_truths": [
+        "Hydraulic excavators are complex machines where low-level controller design and collecting extensive hardware demonstrations pose significant challenges.",
+        "Their dynamics are highly machine-specific, nonlinear, and difficult to model analytically."
+      ],
+      "query_type": "conceptual"
+    },
+    {
+      "query": "What is an AI agent and how does it differ from a regular LLM call?",
+      "ground_truths": [
+        "An AI agent is an autonomous system that can perceive its environment, make decisions, and take actions to achieve a goal.",
+        "Unlike a single LLM call which just generates text, an agent can use tools, maintain memory, and execute multi-step plans."
+      ],
+      "query_type": "conceptual"
+    },
+    {
+      "query": "What is prompt engineering and what are some effective techniques?",
+      "ground_truths": [
+        "Prompt engineering is the practice of designing inputs to LLMs to elicit desired outputs.",
+        "Effective techniques include chain-of-thought prompting, few-shot examples, role assignment, and output format specification."
+      ],
+      "query_type": "conceptual"
+    },
+    {
+      "query": "How does retrieval-augmented generation (RAG) reduce hallucination in language models?",
+      "ground_truths": [
+        "RAG reduces hallucination by grounding LLM responses in retrieved factual documents rather than relying solely on parametric knowledge.",
+        "The model is constrained to generate answers consistent with the retrieved context, making fabrication of facts less likely."
+      ],
+      "query_type": "conceptual"
+    },
+    {
+      "query": "What is the role of embeddings in a vector database and why are they better than keyword search?",
+      "ground_truths": [
+        "Embeddings are dense numerical representations of text that capture semantic meaning.",
+        "Vector search using embeddings finds semantically similar content even when exact keywords don't match, outperforming keyword search for meaning-based retrieval."
+      ],
+      "query_type": "comparison"
+    },
+    {
+      "query": "What is LangGraph and what problem does it solve over basic LangChain chains?",
+      "ground_truths": [
+        "LangGraph is a framework for building stateful, multi-agent workflows using a directed graph of nodes.",
+        "It solves the problem of building complex pipelines with conditional routing, loops, and shared state that are difficult to express in linear LangChain chains."
+      ],
+      "query_type": "comparison"
+    }
+  ]
+}

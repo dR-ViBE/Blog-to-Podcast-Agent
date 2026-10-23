@@ -10,8 +10,8 @@ from typing import Dict
 
 from langchain_core.runnables import RunnableConfig
 
-from graph.state import GraphState
 from graph.chains.improvements_chain import suggest_improvements_chain
+from graph.state import GraphState
 
 
 def suggest_imporvements(state: GraphState, config: RunnableConfig = None) -> Dict:

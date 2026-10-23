@@ -18,10 +18,10 @@
 
 import pytest
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # HEALTH CHECK ENDPOINT — GET /health
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestHealthEndpoint:
     """Tests for GET /health — the liveness probe endpoint."""
@@ -48,6 +48,7 @@ class TestHealthEndpoint:
 # ROOT ENDPOINT — GET /
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestRootEndpoint:
     """Tests for GET / — the root redirect."""
 
@@ -70,6 +71,7 @@ class TestRootEndpoint:
 # ─────────────────────────────────────────────────────────────────────────────
 # OPENAPI SCHEMA — GET /openapi.json and /docs
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestOpenAPISchema:
     """Tests for API documentation endpoints."""
@@ -116,6 +118,7 @@ class TestOpenAPISchema:
 # ─────────────────────────────────────────────────────────────────────────────
 # PODCAST ENDPOINT — POST /podcast (validation layer only)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestPodcastEndpointValidation:
     """
@@ -181,6 +184,7 @@ class TestPodcastEndpointValidation:
 # ─────────────────────────────────────────────────────────────────────────────
 # AUDIO ENDPOINT — GET /audio/{filename}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestAudioEndpoint:
     """Tests for GET /audio/{filename} — the audio file serving endpoint."""

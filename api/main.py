@@ -17,8 +17,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Load environment variables before any internal modules are imported
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # langsmith is imported here only for the startup health check.
 # It does NOT need to be called explicitly anywhere else —
@@ -26,18 +31,12 @@ from fastapi.middleware.cors import CORSMiddleware
 # for automatic tracing of LangChain and LangGraph calls.
 try:
     from langsmith import Client as LangSmithClient
+
     _LANGSMITH_AVAILABLE = True
 except ImportError:
     _LANGSMITH_AVAILABLE = False
 
 from api.routes import router
-
-# ---------------------------------------------------------------------------
-# Load .env before anything else
-# This ensures GROQ_API_KEY, ELEVENLABS_API_KEY, TAVILY_API_KEY, etc. are
-# available as environment variables when the graph modules are imported.
-# ---------------------------------------------------------------------------
-load_dotenv()
 
 
 # ---------------------------------------------------------------------------
@@ -135,18 +134,14 @@ async def lifespan(app: FastAPI):
                 logger.info("LangSmith credentials verified successfully.")
             except Exception as exc:
                 # Don't crash the server — just warn the operator
-                logger.warning(
-                    "LangSmith credential check failed (tracing may not work): %s", exc
-                )
+                logger.warning("LangSmith credential check failed (tracing may not work): %s", exc)
     elif tracing_enabled and not langsmith_key_set:
         logger.warning(
             "LANGCHAIN_TRACING_V2=true but LANGCHAIN_API_KEY is not set. "
             "Tracing will be silently disabled by LangChain."
         )
     else:
-        logger.info(
-            "LangSmith tracing DISABLED. Set LANGCHAIN_TRACING_V2=true in .env to enable."
-        )
+        logger.info("LangSmith tracing DISABLED. Set LANGCHAIN_TRACING_V2=true in .env to enable.")
     # ── End LangSmith startup check ─────────────────────────────────────────
 
     logger.info("Blog-to-Podcast API is ready to accept requests.")
@@ -186,7 +181,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # TODO: restrict to your frontend domain in prod
+    allow_origins=["*"],  # TODO: restrict to your frontend domain in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -203,10 +198,36 @@ app.include_router(router, prefix="")
 
 
 # ---------------------------------------------------------------------------
+# PROMETHEUS METRICS ENDPOINT
+#
+# /metrics is the standard Prometheus scrape endpoint. Prometheus (or any
+# compatible scraper) polls this URL periodically to collect all metric values.
+#
+# HOW IT WORKS:
+#   - prometheus_fastapi_instrumentator auto-instruments all FastAPI routes
+#     (http_request_duration_seconds, http_requests_total, etc.)
+#   - Our custom metrics (api/metrics.py) are also exposed here automatically
+#     because they are registered in the same prometheus_client registry.
+#
+# USAGE:
+#   curl http://localhost:8000/metrics
+#   → Returns all metrics in Prometheus text exposition format
+# ---------------------------------------------------------------------------
+Instrumentator(
+    should_group_status_codes=True,  # Group 2xx/4xx/5xx instead of per-code
+    should_ignore_untemplated=True,   # Ignore unknown routes (reduces cardinality)
+    should_respect_env_var=True,      # Disable via ENABLE_METRICS=false if needed
+    env_var_name="ENABLE_METRICS",
+    excluded_handlers=["/metrics", "/health"],  # Don't instrument the metrics endpoint itself
+).instrument(app).expose(app, endpoint="/metrics", tags=["Observability"])
+
+
+# ---------------------------------------------------------------------------
 # ROOT REDIRECT (optional convenience)
 # ---------------------------------------------------------------------------
 @app.get("/", include_in_schema=False)
 def root():
     """Redirect API root to the interactive Swagger UI docs."""
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/docs")

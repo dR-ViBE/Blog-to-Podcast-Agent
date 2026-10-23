@@ -20,6 +20,7 @@
 #   4. tests are executed
 
 import os
+
 import pytest
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ os.environ.setdefault("ENVIRONMENT", "test")
 # SHARED PYTEST FIXTURES
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="session")
 def fastapi_client():
     """
@@ -93,6 +95,7 @@ def fastapi_client():
     # Import is delayed to here (not at module top) so that env vars above
     # are definitely set before api/main.py and its transitive imports run.
     from fastapi.testclient import TestClient
+
     from api.main import app
 
     # Use TestClient as a context manager to trigger the lifespan (startup/shutdown)

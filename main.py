@@ -1,8 +1,8 @@
-from langchain_core.documents import Document
-from graph.graph import app
-
 from langchain_chroma import Chroma
+from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
+
+from graph.graph import app
 
 retriever = Chroma(
     collection_name="blog_podcast_agent",
