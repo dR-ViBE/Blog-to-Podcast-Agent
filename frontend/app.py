@@ -151,13 +151,18 @@ def init_session_state():
     On subsequent re-runs these values are already set, so nothing changes.
     """
     defaults = {
-        "result": None,  # Stores the last API response dictionary
-        "audio_bytes": None,  # Stores the raw MP3 bytes for the audio player
-        "audio_filename": None,  # Stores the MP3 filename for the download button
-        "is_loading": False,  # True while the API call is in progress
-        "error_message": None,  # Stores an error string to display, if any
-        "ingested_source": None, # Stores the source URL or file path after ingestion
+        "result": None,
+        "audio_bytes": None,
+        "audio_filename": None,
+        "is_loading": False,
+        "error_message": None,
+        "ingested_source": None,
+        "user_id": "Healthcare",
+        "web_search_approved": False,
+        "show_approval_prompt": False,
+        "pending_query": "",
     }
+
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
@@ -172,6 +177,9 @@ def reset_results():
     st.session_state["audio_bytes"] = None
     st.session_state["audio_filename"] = None
     st.session_state["error_message"] = None
+    st.session_state["web_search_approved"] = False
+    st.session_state["show_approval_prompt"] = False
+    st.session_state["pending_query"] = ""
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +195,29 @@ def render_sidebar() -> tuple[str, int]:
     """
     with st.sidebar:
         st.markdown("## ⚙️ Configuration")
+        st.markdown("---")
+
+        # --- Active User Profile (Tenant Isolation) ---
+        st.markdown("👤 **Active User Profile**")
+        st.caption("Ingested content and RAG searches are logically isolated under this profile.")
+        active_user = st.selectbox(
+            label="Active User Profile",
+            options=["Healthcare", "Research Projects", "Stories", "Others", "Custom Profile"],
+            key="user_profile_select",
+            label_visibility="collapsed",
+        )
+        if active_user == "Custom Profile":
+            user_id = st.text_input(
+                label="Custom Profile ID",
+                value="New Project",
+                key="custom_profile_id_input",
+            )
+        else:
+            user_id = active_user
+
+        st.session_state["user_id"] = user_id
+        st.info(f"🔑 Active Tenant ID: `{user_id}`")
+
         st.markdown("---")
 
         # --- API URL ---
@@ -653,22 +684,23 @@ def main():
                 if st.button("🚀 Ingest Document", key="ingest_doc_btn", use_container_width=True):
                     if uploaded_file is not None:
                         with st.spinner("Ingesting and embedding document..."):
-                            file_bytes = uploaded_file.read()
-                            res = make_ingest_request(
-                                api_base_url,
-                                file_data=(uploaded_file.name, file_bytes)
-                            )
+                             file_bytes = uploaded_file.read()
+                             res = make_ingest_request(
+                                 api_base_url,
+                                 file_data=(uploaded_file.name, file_bytes),
+                                 user_id=st.session_state["user_id"]
+                             )
                         if res["success"]:
-                            st.session_state["ingested_source"] = res["data"].get("source")
-                            st.success(
-                                f"✅ Successfully ingested {res['data'].get('chunks')} chunks "
-                                f"from PDF: {uploaded_file.name}!\n\n"
-                                f"Source path set: `{res['data'].get('source')}`"
-                            )
+                             st.session_state["ingested_source"] = res["data"].get("source")
+                             st.success(
+                                 f"✅ Successfully ingested {res['data'].get('chunks')} chunks "
+                                 f"from PDF: {uploaded_file.name} for User: {st.session_state['user_id']}!\n\n"
+                                 f"Source path set: `{res['data'].get('source')}`"
+                             )
                         else:
-                            st.error(f"❌ Ingestion failed: {res['error']}")
+                             st.error(f"❌ Ingestion failed: {res['error']}")
                     else:
-                        st.warning("⚠️ Please select a file to upload first.")
+                         st.warning("⚠️ Please select a file to upload first.")
 
             with tab2:
                 url_to_ingest = st.text_input(
@@ -681,12 +713,16 @@ def main():
                 if st.button("🚀 Ingest URL", key="ingest_url_btn", use_container_width=True):
                     if url_to_ingest and url_to_ingest.startswith("http"):
                         with st.spinner("Crawling and ingesting web page..."):
-                            res = make_ingest_request(api_base_url, url_str=url_to_ingest)
+                            res = make_ingest_request(
+                                api_base_url,
+                                url_str=url_to_ingest,
+                                user_id=st.session_state["user_id"]
+                            )
                         if res["success"]:
                             st.session_state["ingested_source"] = res["data"].get("source")
                             st.success(
                                 f"✅ Successfully ingested {res['data'].get('chunks')} chunks "
-                                f"from URL: {url_to_ingest}!\n\n"
+                                f"from URL: {url_to_ingest} for User: {st.session_state['user_id']}!\n\n"
                                 f"Source filter set: `{res['data'].get('source')}`"
                             )
                         else:
@@ -758,11 +794,45 @@ def main():
                 st.stop()
 
             reset_results()
+            st.session_state["pending_query"] = query.strip()
             st.session_state["is_loading"] = True
+            st.rerun()
 
+        # ── DISPLAY HITL APPROVAL PROMPT ───────────────────────────────────────
+        if st.session_state["show_approval_prompt"]:
+            st.markdown("---")
+            st.warning(
+                f"🔍 **Internet Crawling Required**\n\n"
+                f"The uploaded documents for profile `{st.session_state['user_id']}` do not contain "
+                f"information regarding your query: *\"{st.session_state['pending_query']}\"*."
+            )
+            st.write(
+                "Do you approve the system to crawl the internet to retrieve up-to-date facts "
+                "and generate the podcast?"
+            )
+            
+            col_ap1, col_ap2, _ = st.columns([2, 2, 8])
+            with col_ap1:
+                if st.button("👍 Yes, Approve Web Crawl", type="primary", key="approve_crawl_btn", use_container_width=True):
+                    st.session_state["web_search_approved"] = True
+                    st.session_state["show_approval_prompt"] = False
+                    st.session_state["is_loading"] = True
+                    st.rerun()
+            with col_ap2:
+                if st.button("👎 No, Cancel Search", type="secondary", key="cancel_crawl_btn", use_container_width=True):
+                    reset_results()
+                    st.rerun()
+
+        if st.session_state["is_loading"]:
             with st.status("🚀 Podcast pipeline running...", expanded=True) as status_box:
                 st.write("📡 Connecting to FastAPI backend...")
-                st.write(f"🔍 Retrieving blog chunks for query: **{query}**")
+                st.write(f"🔑 Active profile isolation: **{st.session_state['user_id']}**")
+                
+                if st.session_state["web_search_approved"]:
+                    st.write("🌐 Web crawling: **APPROVED** (fallback enabled)")
+                else:
+                    st.write("📚 Searching local vector store only...")
+                
                 st.write("✍️ Generating podcast script with Groq (LLaMA 3.1)...")
                 st.write("🧑‍⚖️ Grading script quality...")
                 st.write("💡 Iterating with improvement suggestions if needed...")
@@ -771,15 +841,23 @@ def main():
 
                 api_result = make_podcast_request(
                     base_url=api_base_url,
-                    query=query.strip(),
+                    query=st.session_state["pending_query"],
                     max_generations=max_generations,
                     source_filter=source_filter_val.strip() if source_filter_val else None,
+                    user_id=st.session_state["user_id"],
+                    web_search_approved=st.session_state["web_search_approved"],
                 )
 
                 if api_result["success"]:
-                    st.session_state["result"] = api_result["data"]
-                    st.session_state["is_loading"] = False
-                    status_box.update(label="✅ Podcast generated successfully!", state="complete")
+                    data = api_result["data"]
+                    if data.get("status") == "requires_approval":
+                        st.session_state["show_approval_prompt"] = True
+                        st.session_state["is_loading"] = False
+                        status_box.update(label="⚠️ Local context insufficient. Approval needed for web crawling.", state="error")
+                    else:
+                        st.session_state["result"] = data
+                        st.session_state["is_loading"] = False
+                        status_box.update(label="✅ Podcast generated successfully!", state="complete")
                 else:
                     st.session_state["error_message"] = api_result["error"]
                     st.session_state["is_loading"] = False

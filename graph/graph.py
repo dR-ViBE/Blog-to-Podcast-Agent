@@ -74,8 +74,25 @@ workflow.set_entry_point(PLAN_EPISODE)
 # STEP 2: Retriever Agent reasons about outline to fetch targeted documents
 workflow.add_edge(PLAN_EPISODE, RETRIEVE)
 
-# STEP 3: Writer Agent generates a script following the outline and documents
-workflow.add_edge(RETRIEVE, GENERATE_SCRIPT)
+def check_retrieval_status(state: GraphState) -> str:
+    """
+    Checks if retrieval requires human approval to perform web crawl.
+    If yes, halts the graph by routing to END immediately.
+    """
+    if state.get("web_search_required", False) and not state.get("web_search_approved", False):
+        return END
+    return GENERATE_SCRIPT
+
+
+# STEP 3: Conditional routing after retrieval — pause for approval if local results are empty
+workflow.add_conditional_edges(
+    RETRIEVE,
+    check_retrieval_status,
+    {
+        END: END,
+        GENERATE_SCRIPT: GENERATE_SCRIPT,
+    },
+)
 
 # STEP 4: After script generation, the Editor Agent grades quality
 workflow.add_edge(GENERATE_SCRIPT, GRADE_SCRIPT)

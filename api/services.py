@@ -67,6 +67,8 @@ def run_podcast_agent(
     # PII metadata passed in from the route (already processed before graph invocation)
     pii_was_masked: bool = False,
     pii_entities_found: Optional[List[str]] = None,
+    user_id: str = "default_user",
+    web_search_approved: bool = False,
 ) -> PodcastResponse:
     """
     Orchestrates the full Blog-to-Podcast LangGraph pipeline for a given query.
@@ -122,14 +124,19 @@ def run_podcast_agent(
         # PII metadata — set by route layer before graph invocation
         "pii_was_masked": pii_was_masked,
         "pii_entities_found": pii_entities_found,
+        "user_id": user_id,
+        "web_search_approved": web_search_approved,
+        "web_search_required": False,
     }
 
     logger.info(
-        "Graph started | query=%r | max_generations=%d | source_filter=%r | source_type=%r",
+        "Graph started | query=%r | max_generations=%d | source_filter=%r | source_type=%r | user_id=%r | web_approved=%s",
         query,
         max_generations,
         resolved_source_filter,
         resolved_source_type_filter,
+        user_id,
+        web_search_approved,
     )
 
     # ── Build RunnableConfig with rich LangSmith metadata ────────────────────
@@ -144,6 +151,10 @@ def run_podcast_agent(
             _ENVIRONMENT,
             f"max_gen_{max_generations}",
         ],
+        configurable={
+            "user_id": user_id,
+            "web_search_approved": web_search_approved,
+        },
         metadata={
             "application": _APP_NAME,
             "version": _APP_VERSION,
@@ -159,6 +170,8 @@ def run_podcast_agent(
             # PII metadata
             "pii_was_masked": pii_was_masked,
             "pii_entities_found": pii_entities_found,
+            "user_id": user_id,
+            "web_search_approved": web_search_approved,
         },
     )
 
@@ -181,6 +194,33 @@ def run_podcast_agent(
     # ── Invoke the LangGraph app ──────────────────────────────────────────────
     try:
         final_state: dict = langgraph_app.invoke(initial_state, config=run_config)
+        
+        # Intercept approval check:
+        # If we need web search but the user hasn't approved it yet, return requires_approval status
+        web_search_required = final_state.get("web_search_required", False)
+        if web_search_required and not web_search_approved:
+            logger.info("Pipeline paused | requires web search approval | query=%r", query)
+            if mlflow_run:
+                try:
+                    mlflow.log_param("status", "requires_approval")
+                    mlflow.end_run()
+                except Exception:
+                    pass
+            # Record duration before returning
+            elapsed = time.monotonic() - start_time
+            METRICS.pipeline_duration_seconds.observe(elapsed)
+            METRICS.active_pipeline_runs.dec()
+            
+            return PodcastResponse(
+                status="requires_approval",
+                message="The uploaded document does not have information regarding your query or not enough info available in the source provided. Do you approve the system to crawl the internet and get you resources?",
+                web_search_required=True,
+                script=None,
+                audio_path=None,
+                generation_count=0,
+                accepted=False,
+            )
+
         if mlflow_run:
             try:
                 mlflow.log_param("status", "success")
@@ -280,7 +320,22 @@ def run_podcast_agent(
                 mlflow.log_text(script, "generated_script.txt")
                 mlflow.log_metric("script_word_count", len(script.split()))
             
-            eval_score = final_state.get("script_evaluation", {}).get("grade_score", 0.0) if final_state.get("script_evaluation") else 0.0
+            # Safely extract evaluation grade (supports dict, json string, or raw string)
+            eval_score = 0.0
+            eval_data = final_state.get("script_evaluation")
+            if isinstance(eval_data, dict):
+                eval_score = eval_data.get("grade_score", 0.0)
+            elif isinstance(eval_data, str):
+                try:
+                    import json
+                    parsed_eval = json.loads(eval_data)
+                    if isinstance(parsed_eval, dict):
+                        eval_score = parsed_eval.get("grade_score", 0.0)
+                except Exception:
+                    try:
+                        eval_score = float(eval_data)
+                    except ValueError:
+                        pass
             mlflow.log_metric("eval_grade_score", float(eval_score or 0.0))
             
             mlflow.end_run()

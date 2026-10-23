@@ -73,6 +73,8 @@ class PodcastRequest(BaseModel):
         source_filter:   Legacy field: URL prefix to scope ChromaDB retrieval.
                          Prefer using `filters.source_url_prefix` instead.
         filters:         Advanced metadata filters for ChromaDB retrieval.
+        user_id:         The unique ID of the user requesting the podcast (used for isolation).
+        web_search_approved: Set to True if the user approves web search fallback.
     """
 
     query: str = Field(
@@ -105,6 +107,15 @@ class PodcastRequest(BaseModel):
             "PDFs from the /docs/ path."
         ),
     )
+    user_id: Optional[str] = Field(
+        default="default_user",
+        description="The unique ID of the user requesting the podcast (used for logical isolation).",
+        examples=["user_123", "default_user"],
+    )
+    web_search_approved: bool = Field(
+        default=False,
+        description="Set to True if the user explicitly approves web crawling fallback.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +135,9 @@ class PodcastResponse(BaseModel):
         max retries reached without an acceptable script).
 
     Attributes:
-        status:                  "success" or "failed" string indicator.
+        status:                  "success", "failed", or "requires_approval" string indicator.
+        message:                 Detailed user-facing message, e.g. HITL approval query.
+        web_search_required:     True if local search found nothing and needs user consent for web crawl.
         script:                  The final generated podcast script text.
         audio_path:              Relative path to the saved .mp3 file, or None
                                  if audio generation was not reached.
@@ -139,7 +152,9 @@ class PodcastResponse(BaseModel):
         sources_used:            Unique source URLs/paths that contributed documents.
     """
 
-    status: str = Field(description="Indicates whether the pipeline succeeded.")
+    status: str = Field(description="Indicates whether the pipeline succeeded or requires approval.")
+    message: Optional[str] = Field(default=None, description="Descriptive message for human approval.")
+    web_search_required: bool = Field(default=False, description="True if local DB was empty and web search approval is needed.")
     script: Optional[str] = Field(default=None, description="The final podcast script.")
     audio_path: Optional[str] = Field(
         default=None,

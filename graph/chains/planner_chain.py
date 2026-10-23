@@ -26,7 +26,7 @@ from graph.chains.outline_model import EpisodeOutline
 from graph.prompts.loader import load_prompt, get_prompt_version
 
 # ─── LLM Configuration ──────────────────────────────────────────────────────
-llm = ChatGroq(model="llama-3.1-8b-instant")
+llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.0, max_tokens=2500).with_fallbacks([ChatGroq(model="llama-3.3-70b-versatile", temperature=0.0, max_tokens=2500)])
 structured_planner_llm = llm.with_structured_output(EpisodeOutline)
 
 # ─── Load Versioned Prompt ───────────────────────────────────────────────────

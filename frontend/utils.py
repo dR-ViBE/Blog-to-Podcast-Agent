@@ -15,7 +15,14 @@ import requests  # The library used to make HTTP requests to the FastAPI backend
 # They are simple and work well with Streamlit's session_state system.
 
 
-def make_podcast_request(base_url: str, query: str, max_generations: int, source_filter: str = None) -> dict:
+def make_podcast_request(
+    base_url: str,
+    query: str,
+    max_generations: int,
+    source_filter: str = None,
+    user_id: str = "default_user",
+    web_search_approved: bool = False,
+) -> dict:
     """
     Sends a POST request to the FastAPI /podcast endpoint.
 
@@ -29,12 +36,11 @@ def make_podcast_request(base_url: str, query: str, max_generations: int, source
         max_generations: Max number of times the agent will try to improve
                          the script before giving up.
         source_filter:   Optional source path/URL to filter retrieval.
+        user_id:         The unique ID of the user.
+        web_search_approved: True if the user approved fallback web crawling.
 
     Returns:
-        dict with keys:
-            "success" (bool)  — True if the API call worked.
-            "data"    (dict)  — The JSON response body from FastAPI (if success).
-            "error"   (str)   — A human-friendly error message (if failure).
+        dict with success (bool), data (dict), and error (str).
     """
     url = f"{base_url.rstrip('/')}/podcast"
 
@@ -42,6 +48,8 @@ def make_podcast_request(base_url: str, query: str, max_generations: int, source
     payload = {
         "query": query,
         "max_generations": max_generations,
+        "user_id": user_id,
+        "web_search_approved": web_search_approved,
     }
     if source_filter:
         payload["source_filter"] = source_filter
@@ -115,7 +123,12 @@ def make_podcast_request(base_url: str, query: str, max_generations: int, source
         }
 
 
-def make_ingest_request(base_url: str, file_data: tuple = None, url_str: str = None) -> dict:
+def make_ingest_request(
+    base_url: str,
+    file_data: tuple = None,
+    url_str: str = None,
+    user_id: str = "default_user",
+) -> dict:
     """
     Sends a POST request to the FastAPI /ingest endpoint.
 
@@ -123,6 +136,7 @@ def make_ingest_request(base_url: str, file_data: tuple = None, url_str: str = N
         base_url:  The base URL of the FastAPI server.
         file_data: A tuple of (filename, file_bytes) to upload.
         url_str:   A URL string to crawl and ingest.
+        user_id:   The unique ID of the user.
 
     Returns:
         dict with success (bool), data (dict), and error (str).
@@ -133,9 +147,10 @@ def make_ingest_request(base_url: str, file_data: tuple = None, url_str: str = N
         if file_data:
             filename, file_bytes = file_data
             files = {"file": (filename, file_bytes, "application/pdf" if filename.endswith(".pdf") else "text/plain")}
-            response = requests.post(api_url, files=files, timeout=120)
+            data = {"user_id": user_id}
+            response = requests.post(api_url, files=files, data=data, timeout=120)
         elif url_str:
-            data = {"url": url_str}
+            data = {"url": url_str, "user_id": user_id}
             response = requests.post(api_url, data=data, timeout=120)
         else:
             return {"success": False, "error": "Provide either file_data or url_str."}

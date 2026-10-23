@@ -51,7 +51,7 @@ from graph.state import GraphState
 # ─── Retriever Agent Setup ────────────────────────────────────────────────────
 # The LLM is given both tools. Its docstrings tell it when to use each one.
 # llama-3.1-8b-instant supports tool calling via Groq's API.
-_retriever_llm = ChatGroq(model="llama-3.1-8b-instant")
+_retriever_llm = ChatGroq(model="llama-3.1-8b-instant", max_tokens=2500).with_fallbacks([ChatGroq(model="llama-3.3-70b-versatile", max_tokens=2500)])
 _retriever_tools = [search_vectorstore, search_web]
 
 # create_react_agent returns a compiled LangGraph sub-graph.
@@ -132,12 +132,14 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
         config: RunnableConfig for LangSmith tracing.
 
     Returns:
-        Dict with "documents" (List[Document]) and "retrieval_strategy" (dict).
+        Dict with "documents" (List[Document]), "retrieval_strategy" (dict),
+                  and "web_search_required" (bool).
     """
     query = state.get("query", "")
     episode_outline = state.get("episode_outline", {})
     source_filter = state.get("source_filter")
     context_gaps = state.get("context_gaps", "")  # Set by Editor if requesting more context
+    web_search_approved = state.get("web_search_approved", False)
 
     if not query:
         raise ValueError("retrieve_blog_chunks requires 'query' in state")
@@ -160,9 +162,35 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
             f"Retrieve all information needed to write this podcast episode."
         )
 
+    # ── Dynamically compile React Agent based on web search approval ─────────
+    # If the user has not approved web search, the agent does not receive search_web tool.
+    tools = [search_vectorstore]
+    if web_search_approved:
+        tools.append(search_web)
+        agent_prompt = _RETRIEVER_SYSTEM_PROMPT
+    else:
+        agent_prompt = (
+            "You are the Retriever Agent for a podcast production pipeline.\n\n"
+            "Your job is to gather information to produce a podcast episode on the given topic.\n"
+            "You ONLY have access to the `search_vectorstore` tool. "
+            "Under no circumstances do you have `search_web` or any other tool. "
+            "Do NOT attempt to call `search_web` or write tool calls for it. If `search_vectorstore` returns "
+            "insufficient or empty results, simply stop searching."
+        )
+
+    dynamic_agent = create_react_agent(
+        model=_retriever_llm,
+        tools=tools,
+        prompt=agent_prompt,
+    )
+
     # ── Invoke the ReAct agent ─────────────────────────────────────────────────
     # The agent will call tools autonomously until it decides it's done.
-    agent_result = _retriever_agent.invoke({"messages": [("user", agent_input)]})
+    # We set a strict recursion_limit to prevent infinite tool-calling loops that blow up context size and TPM rate limits.
+    agent_result = dynamic_agent.invoke(
+        {"messages": [("user", agent_input)]},
+        {"recursion_limit": 4}
+    )
     all_messages = agent_result.get("messages", [])
 
     # ── Extract documents from tool call results ───────────────────────────────
@@ -189,7 +217,12 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
         pairs = [[query, doc.page_content] for doc in unique_docs]
         scores = model.predict(pairs)
         scored = sorted(zip(unique_docs, scores), key=lambda x: x[1], reverse=True)
-        final_docs = [doc for doc, _ in scored[:4]]  # top 4 (reduces context size to fit Groq 6000 TPM limit)
+        
+        # Apply a strict relevance threshold to discard irrelevant documents
+        # (e.g. generic healthcare articles retrieved for an excavator query)
+        RELEVANCE_THRESHOLD = 0.0005
+        filtered_scored = [(doc, score) for doc, score in scored if score > RELEVANCE_THRESHOLD]
+        final_docs = [doc for doc, _ in filtered_scored[:4]]
 
     # ── Build retrieval strategy summary for state/LangSmith ──────────────────
     tool_calls_made = [
@@ -206,7 +239,14 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
         "context_gaps_addressed": bool(context_gaps),
     }
 
+    # If vector store results are empty and web search hasn't been approved yet,
+    # we flag that web search is required (HITL approval flow).
+    web_search_required = False
+    if not final_docs and not web_search_approved:
+        web_search_required = True
+
     return {
         "documents": final_docs,
         "retrieval_strategy": retrieval_strategy,
+        "web_search_required": web_search_required,
     }

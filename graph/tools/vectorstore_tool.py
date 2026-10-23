@@ -38,6 +38,7 @@ _chroma_client = chromadb.PersistentClient(path="./.chroma")
 def _build_chroma_filter(
     source_filter: str = "",
     source_type_filter: str = "",
+    user_id: str = "",
 ) -> Optional[dict]:
     """
     Build a ChromaDB metadata filter dict from optional filter parameters.
@@ -51,11 +52,15 @@ def _build_chroma_filter(
     Args:
         source_filter:      URL prefix or file path substring to match against "source" metadata.
         source_type_filter: Exact source type to match: "url" | "pdf" | "text" | "directory".
+        user_id:            Unique user identifier to isolate vector content.
 
     Returns:
         A ChromaDB-compatible filter dict, or None if no filters provided.
     """
     conditions = []
+
+    if user_id and user_id.strip():
+        conditions.append({"user_id": {"$eq": user_id.strip()}})
 
     if source_filter and source_filter.strip():
         conditions.append({"source": {"$contains": source_filter.strip()}})
@@ -73,11 +78,14 @@ def _build_chroma_filter(
         return {"$and": conditions}
 
 
+from langchain_core.runnables import RunnableConfig
+
 @tool
 def search_vectorstore(
     query: str,
     source_filter: str = "",
     source_type_filter: str = "",
+    config: RunnableConfig = None,
 ) -> str:
     """
     Search the local ChromaDB vector store for content relevant to the query.
@@ -98,12 +106,24 @@ def search_vectorstore(
                             One of: "url", "pdf", "text", "directory".
                             Example: "pdf" to only search ingested PDF documents.
                             Leave as empty string "" to search all content types.
+        config: Optional. LangChain RunnableConfig containing runtime parameters.
 
     Returns:
         The top relevant text chunks from the vector store, concatenated as a
         single string separated by "---". Returns a message if nothing is found.
     """
-    chroma_filter = _build_chroma_filter(source_filter, source_type_filter)
+    user_id = "default_user"
+    if config:
+        if isinstance(config, dict):
+            user_id = config.get("configurable", {}).get("user_id", "default_user")
+        else:
+            configurable = getattr(config, "configurable", None)
+            if configurable:
+                user_id = getattr(configurable, "get", lambda k, d: d)("user_id", "default_user")
+            elif hasattr(config, "get"):
+                user_id = config.get("configurable", {}).get("user_id", "default_user")
+
+    chroma_filter = _build_chroma_filter(source_filter, source_type_filter, user_id=user_id)
 
     if chroma_filter:
         logger.debug("VectorStore search | query=%r | filter=%s", query[:60], chroma_filter)

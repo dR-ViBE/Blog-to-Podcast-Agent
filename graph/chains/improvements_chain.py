@@ -9,7 +9,7 @@ from langchain_groq import ChatGroq
 
 from graph.prompts.loader import load_prompt, get_prompt_version
 
-llm = ChatGroq(model="llama-3.1-8b-instant")
+llm = ChatGroq(model="llama-3.1-8b-instant", max_tokens=2500).with_fallbacks([ChatGroq(model="llama-3.3-70b-versatile", max_tokens=2500)])
 
 # ─── Load Versioned Prompt ───────────────────────────────────────────────────
 _IMPROVEMENTS_VERSION = get_prompt_version("improvements")

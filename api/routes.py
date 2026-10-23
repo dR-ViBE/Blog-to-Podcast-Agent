@@ -217,6 +217,8 @@ def generate_podcast(request: PodcastRequest) -> PodcastResponse:
             filters=request.filters,
             pii_was_masked=pii_was_masked,
             pii_entities_found=pii_entities_found,
+            user_id=request.user_id,
+            web_search_approved=request.web_search_approved,
         )
     except RuntimeError as exc:
         logger.error("Pipeline error | query=%r | error=%s", request.query, exc)
@@ -325,6 +327,7 @@ def serve_audio(filename: str) -> FileResponse:
 def ingest_data(
     file: Optional[UploadFile] = File(None),
     url: Optional[str] = Form(None),
+    user_id: str = Form("default_user"),
 ):
     """
     POST /ingest
@@ -354,7 +357,7 @@ def ingest_data(
             with file_path.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
 
-            chunks = ingest_source(str(file_path))
+            chunks = ingest_source(str(file_path), user_id=user_id)
 
             METRICS.ingestion_chunks_total.labels(source_type=source_type).inc(chunks)
             METRICS.ingestion_requests_total.labels(
@@ -363,11 +366,20 @@ def ingest_data(
 
             return {
                 "status": "success",
-                "message": f"Successfully ingested {chunks} chunks from file: {file.filename}",
+                "message": f"Successfully ingested {chunks} chunks from file: {file.filename} for user: {user_id}",
                 "chunks": chunks,
                 "source": str(file_path.resolve()),
                 "source_type": source_type,
             }
+        except ValueError as exc:
+            METRICS.ingestion_requests_total.labels(
+                source_type=source_type, status="failed"
+            ).inc()
+            logger.warning("Ingestion validation failed for file: %s, Error: %s", file.filename, exc)
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            )
         except Exception as exc:
             METRICS.ingestion_requests_total.labels(
                 source_type=source_type, status="failed"
@@ -380,7 +392,7 @@ def ingest_data(
 
     if url:
         try:
-            chunks = ingest_source(url)
+            chunks = ingest_source(url, user_id=user_id)
 
             METRICS.ingestion_chunks_total.labels(source_type="url").inc(chunks)
             METRICS.ingestion_requests_total.labels(
@@ -389,11 +401,20 @@ def ingest_data(
 
             return {
                 "status": "success",
-                "message": f"Successfully ingested {chunks} chunks from URL: {url}",
+                "message": f"Successfully ingested {chunks} chunks from URL: {url} for user: {user_id}",
                 "chunks": chunks,
                 "source": url,
                 "source_type": "url",
             }
+        except ValueError as exc:
+            METRICS.ingestion_requests_total.labels(
+                source_type="url", status="failed"
+            ).inc()
+            logger.warning("Ingestion validation failed for URL: %s, Error: %s", url, exc)
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            )
         except Exception as exc:
             METRICS.ingestion_requests_total.labels(
                 source_type="url", status="failed"

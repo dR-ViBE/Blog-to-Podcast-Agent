@@ -66,7 +66,7 @@ _splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
 # ─── Individual Loaders ───────────────────────────────────────────────────────
 
 
-def _load_from_url(url: str) -> List[Document]:
+def _load_from_url(url: str, user_id: str = "default_user") -> List[Document]:
     """
     Crawls a URL using Tavily and returns LangChain Documents.
     This is the original ingestion path — unchanged.
@@ -83,10 +83,15 @@ def _load_from_url(url: str) -> List[Document]:
     response = tavily_crawl.invoke({"url": url, "max_depth": 2, "max_breadth": 4})
 
     if isinstance(response, str):
+        if not response.strip():
+            raise ValueError(f"Tavily returned an empty response for URL (possible rate limit or fetch failure): {url}")
         try:
             response = json.loads(response)
         except json.JSONDecodeError:
-            raise ValueError(f"Tavily returned an invalid response for URL: {url}")
+            # If it's just plain text, treat it as the content itself
+            if "error" in response.lower()[:50]:
+                raise ValueError(f"Tavily returned an error for URL {url}: {response[:100]}")
+            response = {"results": [{"url": url, "content": response}]}
 
     pages = response.get("results", [])
     documents = []
@@ -102,6 +107,7 @@ def _load_from_url(url: str) -> List[Document]:
                     "source_type": "url",
                     "title": page.get("title", ""),
                     "ingested_at": datetime.now(timezone.utc).isoformat(),
+                    "user_id": user_id,
                 },
             )
         )
@@ -110,7 +116,7 @@ def _load_from_url(url: str) -> List[Document]:
     return documents
 
 
-def _load_from_pdf(path: str) -> List[Document]:
+def _load_from_pdf(path: str, user_id: str = "default_user") -> List[Document]:
     """
     Loads a PDF file using PyPDFLoader.
     Each page becomes a Document. Metadata includes file path and page number.
@@ -125,12 +131,13 @@ def _load_from_pdf(path: str) -> List[Document]:
         doc.metadata["source_type"] = "pdf"
         doc.metadata.setdefault("title", Path(path).stem)
         doc.metadata["ingested_at"] = datetime.now(timezone.utc).isoformat()
+        doc.metadata["user_id"] = user_id
 
     print(f"  [PDF] Loaded {len(docs)} pages.")
     return docs
 
 
-def _load_from_text(path: str) -> List[Document]:
+def _load_from_text(path: str, user_id: str = "default_user") -> List[Document]:
     """
     Loads a plain text or markdown file using TextLoader.
     The entire file becomes one Document before chunking.
@@ -144,12 +151,13 @@ def _load_from_text(path: str) -> List[Document]:
         doc.metadata["source_type"] = "text"
         doc.metadata.setdefault("title", Path(path).stem)
         doc.metadata["ingested_at"] = datetime.now(timezone.utc).isoformat()
+        doc.metadata["user_id"] = user_id
 
     print(f"  [TEXT] Loaded {len(docs)} document(s).")
     return docs
 
 
-def _load_from_directory(directory: str) -> List[Document]:
+def _load_from_directory(directory: str, user_id: str = "default_user") -> List[Document]:
     """
     Recursively loads all supported files (.txt, .md, .rst, .pdf) in a directory.
     Uses DirectoryLoader with glob patterns to find files.
@@ -164,9 +172,9 @@ def _load_from_directory(directory: str) -> List[Document]:
         for file in files:
             try:
                 if ext == ".pdf":
-                    docs = _load_from_pdf(str(file))
+                    docs = _load_from_pdf(str(file), user_id=user_id)
                 else:
-                    docs = _load_from_text(str(file))
+                    docs = _load_from_text(str(file), user_id=user_id)
                 all_docs.extend(docs)
             except Exception as e:
                 print(f"  [WARNING] Skipping {file}: {e}")
@@ -178,7 +186,7 @@ def _load_from_directory(directory: str) -> List[Document]:
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
 
 
-def ingest_source(source: str) -> int:
+def ingest_source(source: str, user_id: str = "default_user") -> int:
     """
     Unified ingestion function. Detects the source type, loads documents,
     chunks them, embeds them, and stores them in ChromaDB.
@@ -188,6 +196,7 @@ def ingest_source(source: str) -> int:
             - A URL string starting with "http://" or "https://"
             - A file path ending in .pdf, .txt, .md, .rst
             - A directory path
+        user_id: The unique ID of the user owning these documents.
 
     Returns:
         The number of chunks successfully ingested into ChromaDB.
@@ -197,22 +206,22 @@ def ingest_source(source: str) -> int:
         FileNotFoundError: If a local path does not exist.
     """
     print(f"\n{'=' * 60}")
-    print(f"  Ingesting source: {source}")
+    print(f"  Ingesting source: {source} for user_id: {user_id}")
     print(f"{'=' * 60}")
 
     # ── Detect source type ────────────────────────────────────────────────────
     if source.startswith("http://") or source.startswith("https://"):
-        raw_docs = _load_from_url(source)
+        raw_docs = _load_from_url(source, user_id=user_id)
 
     elif os.path.isdir(source):
-        raw_docs = _load_from_directory(source)
+        raw_docs = _load_from_directory(source, user_id=user_id)
 
     elif os.path.isfile(source):
         suffix = Path(source).suffix.lower()
         if suffix == ".pdf":
-            raw_docs = _load_from_pdf(source)
+            raw_docs = _load_from_pdf(source, user_id=user_id)
         elif suffix in {".txt", ".md", ".rst"}:
-            raw_docs = _load_from_text(source)
+            raw_docs = _load_from_text(source, user_id=user_id)
         else:
             raise ValueError(
                 f"Unsupported file extension: '{suffix}'. Supported: .pdf, .txt, .md, .rst"

@@ -57,6 +57,9 @@ class GraphState(TypedDict):
     query: str
     source_filter: Optional[str]           # Phase 1: optional ChromaDB source URL/path filter
     source_type_filter: Optional[str]      # Phase 1: optional source type filter (url/pdf/text)
+    user_id: str
+    web_search_approved: bool
+    web_search_required: bool
     documents: List[Document]
     episode_outline: Optional[dict]         # Planner Agent output
     retrieval_strategy: Optional[dict]      # Retriever Agent tool-use summary

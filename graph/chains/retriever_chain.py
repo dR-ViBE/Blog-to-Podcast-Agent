@@ -24,7 +24,7 @@ class RetrievalStrategy(BaseModel):
     )
 
 
-llm = ChatGroq(model="llama-3.1-8b-instant")
+llm = ChatGroq(model="llama-3.1-8b-instant", max_tokens=2500).with_fallbacks([ChatGroq(model="llama-3.3-70b-versatile", max_tokens=2500)])
 structured_retriever_llm = llm.with_structured_output(RetrievalStrategy)
 
 # ─── Load Versioned Prompt ───────────────────────────────────────────────────
