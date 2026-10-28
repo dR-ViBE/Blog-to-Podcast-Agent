@@ -71,9 +71,10 @@ chunked_docs = text_splitter.split_documents(documents)
 if chunked_docs:
     vectorstore = Chroma.from_documents(
         documents=chunked_docs,
-        collection_name="blog_podcast_agent",
+        collection_name="blog_podcast_agent_v2",  # v2: cosine distance
         embedding=OllamaEmbeddings(model="nomic-embed-text"),
         persist_directory="./.chroma",
+        collection_metadata={"hnsw:space": "cosine"},  # #8 Phase 1: cosine distance
     )
     print(f" Ingestion complete. Stored {len(chunked_docs)} chunks.")
 else:

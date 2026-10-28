@@ -17,11 +17,23 @@ from typing import Literal, Optional
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableSequence
 from langchain_groq import ChatGroq
+from langchain_ollama import ChatOllama
 from pydantic import BaseModel, Field
 
 from graph.prompts.loader import load_prompt, get_prompt_version
 
-llm = ChatGroq(model="llama-3.1-8b-instant", max_tokens=2500).with_fallbacks([ChatGroq(model="llama-3.3-70b-versatile", max_tokens=2500)])
+# ─── LLM Configuration (Two-Tier Fallback) ──────────────────────────────────
+# Tier 1 (Primary)  : Groq llama-3.1-8b-instant — fast, cheap.
+# Tier 2 (Fallback) : Groq llama-3.3-70b-versatile — more capable Groq model.
+# Tier 3 (Local)    : Ollama phi3 — free local fallback if Groq is unreachable.
+_primary_llm = ChatGroq(model="llama-3.1-8b-instant", max_tokens=2500)
+_groq_fallback = ChatGroq(model="llama-3.3-70b-versatile", max_tokens=2500)
+_local_fallback = ChatOllama(model="phi3:latest")
+
+llm = _primary_llm.with_fallbacks(
+    [_groq_fallback, _local_fallback],
+    exceptions_to_handle=(Exception,),
+)
 
 
 class GradeScript(BaseModel):

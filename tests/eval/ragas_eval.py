@@ -73,10 +73,13 @@ from graph.chains.retriever_chain import retriever_chain
 GOLDEN_DATASET_PATH = Path(__file__).parent / "golden_dataset.json"
 RESULTS_OUTPUT_PATH = Path(__file__).parent / "ragas_results.json"
 
-CHROMA_COLLECTION = "blog_podcast_agent"
+CHROMA_COLLECTION = "blog_podcast_agent_v2"  # v2: cosine distance
 CHROMA_DIR = "./.chroma"
 EMBEDDING_MODEL = "nomic-embed-text"
 RERANKER_MODEL = "BAAI/bge-reranker-base"
+
+# Cache CrossEncoder at module level (same as production — loads once, reused per query)
+_CROSS_ENCODER = CrossEncoder(RERANKER_MODEL)
 TOP_K_PER_QUERY = 4
 FINAL_TOP_K = 6
 
@@ -146,6 +149,7 @@ def run_retrieval_pipeline(query: str) -> List[str]:
         collection_name=CHROMA_COLLECTION,
         embedding_function=OllamaEmbeddings(model=EMBEDDING_MODEL),
         persist_directory=CHROMA_DIR,
+        collection_metadata={"hnsw:space": "cosine"},  # #8 Phase 1: cosine distance
     )
 
     all_docs = []
@@ -163,13 +167,12 @@ def run_retrieval_pipeline(query: str) -> List[str]:
             seen.add(h)
             unique_docs.append(doc)
 
-    # Reranking
+    # Reranking (uses module-level cached CrossEncoder — same pattern as production)
     if not unique_docs:
         return []
 
-    model = CrossEncoder(RERANKER_MODEL)
     pairs = [[query, doc.page_content] for doc in unique_docs]
-    scores = model.predict(pairs)
+    scores = _CROSS_ENCODER.predict(pairs)
     scored = sorted(zip(unique_docs, scores), key=lambda x: x[1], reverse=True)
     final_docs = [doc for doc, _ in scored[:FINAL_TOP_K]]
 
