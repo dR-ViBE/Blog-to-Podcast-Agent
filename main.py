@@ -5,9 +5,10 @@ from langchain_ollama import OllamaEmbeddings
 from graph.graph import app
 
 retriever = Chroma(
-    collection_name="blog_podcast_agent",
+    collection_name="blog_podcast_agent_v2",  # v2: cosine distance
     persist_directory="./.chroma",
     embedding_function=OllamaEmbeddings(model="nomic-embed-text"),
+    collection_metadata={"hnsw:space": "cosine"},  # #8 Phase 1: cosine distance
 ).as_retriever()
 
 docs = retriever.invoke("Summarize this blog as a podcast")

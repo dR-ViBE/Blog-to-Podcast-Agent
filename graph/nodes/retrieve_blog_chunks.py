@@ -43,9 +43,20 @@ from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_groq import ChatGroq
 from langgraph.prebuilt import create_react_agent
+from sentence_transformers import CrossEncoder
 
 from graph.tools import search_vectorstore, search_web
 from graph.state import GraphState
+
+# ─── Module-Level CrossEncoder Cache ────────────────────────────────────────
+# IMPORTANT: Do NOT instantiate CrossEncoder inside the retrieve_blog_chunks()
+# function. Doing so reloads the ~500MB model from disk on every pipeline run
+# (3-8 seconds of wasted overhead, and 3 copies in RAM for 3 concurrent users).
+#
+# By instantiating at module level, the model is loaded ONCE when Python first
+# imports this file, then reused across all invocations. CrossEncoder.predict()
+# is stateless and thread-safe for inference.
+_CROSS_ENCODER = CrossEncoder("BAAI/bge-reranker-base")
 
 
 # ─── Retriever Agent Setup ────────────────────────────────────────────────────
@@ -205,19 +216,17 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
             seen.add(h)
             unique_docs.append(doc)
 
-    # ── Reranking (cross-encoder — same as before) ─────────────────────────────
-    # Even though the agent selected the tools intelligently, we still rerank
-    # to ensure the Writer receives the most relevant chunks first.
-    from sentence_transformers import CrossEncoder
-
+    # ── Reranking (cross-encoder) ──────────────────────────────────────────────
+    # Uses the module-level _CROSS_ENCODER instance (loaded once at import time).
+    # Even though the agent selected tools intelligently, we still rerank to
+    # ensure the Writer receives the most relevant chunks first.
     if not unique_docs:
         final_docs = []
     else:
-        model = CrossEncoder("BAAI/bge-reranker-base")
         pairs = [[query, doc.page_content] for doc in unique_docs]
-        scores = model.predict(pairs)
+        scores = _CROSS_ENCODER.predict(pairs)
         scored = sorted(zip(unique_docs, scores), key=lambda x: x[1], reverse=True)
-        
+
         # Apply a strict relevance threshold to discard irrelevant documents
         # (e.g. generic healthcare articles retrieved for an excavator query)
         RELEVANCE_THRESHOLD = 0.0005

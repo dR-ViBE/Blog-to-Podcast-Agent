@@ -129,9 +129,12 @@ def search_vectorstore(
         logger.debug("VectorStore search | query=%r | filter=%s", query[:60], chroma_filter)
 
     vectorstore = Chroma(
-        collection_name="blog_podcast_agent",
+        collection_name="blog_podcast_agent_v2",  # v2: cosine distance
         client=_chroma_client,
         embedding_function=OllamaEmbeddings(model="nomic-embed-text"),
+        # #8 Phase 1: Cosine distance — industry standard for normalized text embeddings.
+        # Must match the collection_metadata used at ingestion time.
+        collection_metadata={"hnsw:space": "cosine"},
     )
 
     docs = vectorstore.similarity_search(

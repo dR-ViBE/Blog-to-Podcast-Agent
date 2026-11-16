@@ -45,7 +45,7 @@ load_dotenv()
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-CHROMA_COLLECTION = "blog_podcast_agent"
+CHROMA_COLLECTION = "blog_podcast_agent_v2"  # v2: cosine distance (was L2 in v1)
 CHROMA_DIR = "./.chroma"
 EMBEDDING_MODEL = "nomic-embed-text"
 CHUNK_SIZE = 300  # tokens — same as the original ingestion.py
@@ -252,6 +252,10 @@ def ingest_source(source: str, user_id: str = "default_user") -> int:
         collection_name=CHROMA_COLLECTION,
         embedding_function=OllamaEmbeddings(model=EMBEDDING_MODEL),
         persist_directory=CHROMA_DIR,
+        # #8 Phase 1: Use cosine distance (industry standard for normalized text embeddings).
+        # nomic-embed-text produces unit-norm vectors → cosine = canonical choice.
+        # Creates a NEW collection; cannot change metric on existing collection.
+        collection_metadata={"hnsw:space": "cosine"},
     )
 
     # Add documents in one batch

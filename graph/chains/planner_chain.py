@@ -21,12 +21,25 @@
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
+from langchain_ollama import ChatOllama
 
 from graph.chains.outline_model import EpisodeOutline
 from graph.prompts.loader import load_prompt, get_prompt_version
 
-# ─── LLM Configuration ──────────────────────────────────────────────────────
-llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.0, max_tokens=2500).with_fallbacks([ChatGroq(model="llama-3.3-70b-versatile", temperature=0.0, max_tokens=2500)])
+# ─── LLM Configuration (Two-Tier Fallback) ──────────────────────────────────
+# Tier 1 (Primary)  : Groq llama-3.1-8b-instant — fast, cheap, cloud-hosted.
+# Tier 2 (Fallback) : Groq llama-3.3-70b-versatile — more capable Groq model.
+# Tier 3 (Local)    : Ollama phi3 — free, runs locally, zero external dependency.
+#                     Activates if Groq is unreachable (404, 429, 503) or model
+#                     is deprecated. Prevents AWS 500 errors on Groq outages.
+_primary_llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.0, max_tokens=2500)
+_groq_fallback = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.0, max_tokens=2500)
+_local_fallback = ChatOllama(model="phi3:latest", temperature=0.0)
+
+llm = _primary_llm.with_fallbacks(
+    [_groq_fallback, _local_fallback],
+    exceptions_to_handle=(Exception,),
+)
 structured_planner_llm = llm.with_structured_output(EpisodeOutline)
 
 # ─── Load Versioned Prompt ───────────────────────────────────────────────────
