@@ -1484,6 +1484,29 @@ files = [
 ]
 
 [[package]]
+name = "elevenlabs"
+version = "2.78.0"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.8"
+groups = ["main"]
+files = [
+    {file = "elevenlabs-2.78.0-py3-none-any.whl", hash = "sha256:a09f59beb73a9805f90ff719182e2f91e4d418ef9327fd984d8aa97a51004351"},
+    {file = "elevenlabs-2.78.0.tar.gz", hash = "sha256:8b33e5a51ea04f89e47e0d08b1709a837e9208dc84076c692aefeeb492c59378"},
+]
+
+[package.dependencies]
+httpx = ">=0.21.2"
+pydantic = ">=1.9.2"
+pydantic-core = ">=2.18.2"
+requests = ">=2.20"
+typing_extensions = ">=4.0.0"
+websockets = ">=13.0"
+
+[package.extras]
+pyaudio = ["pyaudio (>=0.2.14)"]
+
+[[package]]
 name = "fastapi"
 version = "0.138.1"
 description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
@@ -9086,4 +9109,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "967259739e356c4aefcfb26f27ee8b574e7c1b8ffb6c9cc8f380a4d1632082c2"
+content-hash = "beaeeb0fd85813c4146d50b1f306400d1a8122fbe7cca039d7efc7bcb65947c4"
