@@ -178,16 +178,19 @@ jobs:
             # `--remove-orphans`   → remove containers for services no longer in compose file
             # Docker replaces only containers whose image has changed.
             echo "[3/4] Restarting containers..."
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # '|| true' prevents set -e from killing the script if compose exits non-zero
+            # due to a health check dependency failure. Our polling loop below is the
+            # definitive health gate — not docker compose's exit code.
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans || true
             echo "      Containers restarted."
 
             # ── Step 4: Health check gate ──────────────────────────────────
-            # Poll the /health endpoint every 10 seconds for up to 200 seconds.
-            # The CrossEncoder model load takes ~30-60s on t3.medium.
-            # If health check fails, the deployment is marked as FAILED and
-            # GitHub sends a notification. The old container stays running.
-            echo "[4/4] Waiting for API to become healthy..."
-            MAX_ATTEMPTS=20
+            # Poll the /health endpoint every 10 seconds for up to 660 seconds (11 minutes).
+            # First deploy downloads CrossEncoder model (~1.1 GB from HuggingFace Hub)
+            # which can take 5-8 minutes on a t3.medium. Subsequent deploys use the
+            # hf_cache volume and are healthy in ~30 seconds.
+            echo "[4/4] Waiting for API to become healthy (up to 11 min on first deploy)..."
+            MAX_ATTEMPTS=66
             for i in $(seq 1 $MAX_ATTEMPTS); do
               if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
                 echo ""

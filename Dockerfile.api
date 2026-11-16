@@ -51,6 +51,16 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-interaction --no-ansi --no-root --without dev \
     && rm -rf /tmp/poetry-cache
 
+# ── Extra packages via pip ───────────────────────────────────────────────────
+# sentence-transformers and langgraph-checkpoint-sqlite have dependency
+# conflicts with huggingface-hub that poetry's strict resolver can't reconcile
+# (sentence-transformers -> transformers -> huggingface-hub<1.0 vs our >=1.5.0).
+# pip's more permissive resolver handles this correctly — matching exactly how
+# the local dev environment works.
+RUN pip install --no-cache-dir \
+    sentence-transformers \
+    langgraph-checkpoint-sqlite
+
 # ── Copy application source code ────────────────────────────────────────────
 # Copying source code happens AFTER dependency installation so that changing
 # a .py file doesn't invalidate the dependency cache layer above.

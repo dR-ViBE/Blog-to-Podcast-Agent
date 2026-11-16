@@ -80,6 +80,10 @@ services:
       APP_VERSION: "1.0.0"
       ENVIRONMENT: production
       ENABLE_METRICS: "true"
+      # Cache HuggingFace models in a named volume so CrossEncoder (BAAI/bge-reranker-base)
+      # is only downloaded once and persists across container recreations.
+      TRANSFORMERS_CACHE: /root/.cache/huggingface
+      HF_HOME: /root/.cache/huggingface
 
     # Production command: NO --reload flag (hot-reload not needed/safe in prod)
     command:
@@ -98,6 +102,9 @@ services:
       - ./.chroma:/app/.chroma
       # Generated audio files + Prometheus metrics + LangGraph checkpoints
       - ./outputs:/app/outputs
+      # HuggingFace model cache — CrossEncoder (BAAI/bge-reranker-base, ~1.1 GB)
+      # downloads only on first deploy; reused on all subsequent ones.
+      - hf_cache:/root/.cache/huggingface
 
     depends_on:
       ollama-pull:
@@ -107,8 +114,10 @@ services:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health > /dev/null"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 90s    # CrossEncoder model load takes ~30-60s on t3.medium
+      retries: 5
+      # Long start_period: first deploy downloads CrossEncoder model (~1.1 GB from HuggingFace).
+      # After first deploy the model is cached in hf_cache volume — subsequent startups are fast.
+      start_period: 600s
 
     networks:
       - podcast_network
@@ -176,6 +185,8 @@ services:
 volumes:
   ollama_data:
     name: podcast_agent_ollama_data    # Ollama model weights (~270 MB)
+  hf_cache:
+    name: podcast_agent_hf_cache       # HuggingFace CrossEncoder model (~1.1 GB, downloaded once)
   prometheus_data:
     name: podcast_agent_prometheus_data
   grafana_data:

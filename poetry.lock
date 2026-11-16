@@ -9109,4 +9109,8 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
+<<<<<<< Updated upstream
 content-hash = "beaeeb0fd85813c4146d50b1f306400d1a8122fbe7cca039d7efc7bcb65947c4"
+=======
+content-hash = "2efe03ffd7d476b53326c5729091075599521e34f92bbb84b1d5706fad90b79a"
+>>>>>>> Stashed changes
