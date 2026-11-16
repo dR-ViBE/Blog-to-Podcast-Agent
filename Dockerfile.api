@@ -52,14 +52,11 @@ RUN poetry install --no-interaction --no-ansi --no-root --without dev \
     && rm -rf /tmp/poetry-cache
 
 # ── Extra packages via pip ───────────────────────────────────────────────────
-# sentence-transformers and langgraph-checkpoint-sqlite have dependency
-# conflicts with huggingface-hub that poetry's strict resolver can't reconcile
-# (sentence-transformers -> transformers -> huggingface-hub<1.0 vs our >=1.5.0).
-# pip's more permissive resolver handles this correctly — matching exactly how
-# the local dev environment works.
-RUN pip install --no-cache-dir \
-    sentence-transformers \
-    langgraph-checkpoint-sqlite
+# sentence-transformers needs torch, but the default torch install is CUDA-enabled
+# (~2.5 GB) which is pointless on t3.medium (no GPU) and fills the 20 GB disk.
+# We install CPU-only torch first (~600 MB), then sentence-transformers picks it up.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir sentence-transformers langgraph-checkpoint-sqlite
 
 # ── Copy application source code ────────────────────────────────────────────
 # Copying source code happens AFTER dependency installation so that changing
