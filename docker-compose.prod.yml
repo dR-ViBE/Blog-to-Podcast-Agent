@@ -32,8 +32,8 @@ services:
     networks:
       - podcast_network
     healthcheck:
-      # /api/tags returns 200 once Ollama is fully initialised
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags > /dev/null"]
+      # ollama list succeeds once Ollama server is ready (curl not in ollama image)
+      test: ["CMD-SHELL", "ollama list > /dev/null 2>&1"]
       interval: 15s
       timeout: 10s
       retries: 10
