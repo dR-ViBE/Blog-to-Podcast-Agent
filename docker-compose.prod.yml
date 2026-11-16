@@ -1,21 +1,52 @@
+# docker-compose.prod.yml
+#
+# Production deployment configuration for Blog-to-Podcast Agent on AWS EC2.
+#
+# KEY DIFFERENCES FROM docker-compose.yml (dev):
+#   - api + frontend use pre-built ECR images (no local build: step)
+#   - No source code bind mounts (no hot-reload in production)
+#   - ENVIRONMENT=production, no --reload flag on uvicorn
+#   - Ports: api exposed on 8000, frontend on 80
+#   - prometheus + grafana available via --profile monitoring
+#
+# REQUIRED on the EC2 server (in /home/ec2-user/podcast-agent/.env):
+#   AWS_ACCOUNT_ID, AWS_REGION, IMAGE_TAG, all API keys
+#
+# USAGE on EC2:
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
 services:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # OLLAMA — Local embedding model server
+  # Serves nomic-embed-text embeddings used by the retrieval pipeline.
+  # Uses a named Docker volume so model weights persist across deployments.
+  # ─────────────────────────────────────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
+    container_name: podcast_ollama
     restart: unless-stopped
     volumes:
-      - ollama_data:/root/.ollama
+      - ollama_data:/root/.ollama     # Persists model weights across restarts
     networks:
       - podcast_network
     healthcheck:
-      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      # /api/tags returns 200 once Ollama is fully initialised
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags > /dev/null"]
       interval: 15s
       timeout: 10s
       retries: 10
       start_period: 30s
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # OLLAMA-PULL — One-shot model download
+  # Pulls nomic-embed-text on first boot. Near-instant if already in volume.
+  # restart: "no" means it runs once and exits — never restarts.
+  # ─────────────────────────────────────────────────────────────────────────
   ollama-pull:
     image: ollama/ollama:latest
+    container_name: podcast_ollama_pull
     restart: "no"
     environment:
       OLLAMA_HOST: http://ollama:11434
@@ -26,20 +57,31 @@ services:
     networks:
       - podcast_network
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # API — FastAPI backend
+  # Uses pre-built image from ECR. Image URI is composed from env vars in .env.
+  # ─────────────────────────────────────────────────────────────────────────
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
+    # Image pulled from AWS ECR — built by GitHub Actions CD pipeline.
+    # ${AWS_ACCOUNT_ID}, ${AWS_REGION}, ${IMAGE_TAG} come from .env on EC2.
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/blog-to-podcast-api:${IMAGE_TAG:-latest}
+    container_name: podcast_api
     restart: unless-stopped
+
+    # Load all API keys from the .env file on the EC2 server.
+    # Real secrets never live in this file — they're in .env which is never committed.
     env_file:
       - .env
+
+    # Production-specific overrides (take precedence over .env values).
     environment:
-      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_HOST: http://ollama:11434   # Must point to Docker service, not localhost
       APP_NAME: blog-to-podcast-agent
       APP_VERSION: "1.0.0"
       ENVIRONMENT: production
       ENABLE_METRICS: "true"
-      LANGCHAIN_TRACING_V2: "false"
+
+    # Production command: NO --reload flag (hot-reload not needed/safe in prod)
     command:
       - uvicorn
       - api.main:app
@@ -47,42 +89,61 @@ services:
       - 0.0.0.0
       - --port
       - "8000"
+
+    ports:
+      - "8000:8000"    # Exposes FastAPI + Swagger docs externally
+
     volumes:
+      # ChromaDB vector store — persists ingested documents across deployments
       - ./.chroma:/app/.chroma
+      # Generated audio files + Prometheus metrics + LangGraph checkpoints
       - ./outputs:/app/outputs
+
     depends_on:
       ollama-pull:
         condition: service_completed_successfully
+
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health > /dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 90s
+      start_period: 90s    # CrossEncoder model load takes ~30-60s on t3.medium
+
     networks:
       - podcast_network
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # FRONTEND — Streamlit UI
+  # Uses pre-built image from ECR.
+  # ─────────────────────────────────────────────────────────────────────────
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/blog-to-podcast-frontend:${IMAGE_TAG:-latest}
+    container_name: podcast_frontend
     restart: unless-stopped
     environment:
+      # API_BASE_URL tells Streamlit where to reach FastAPI.
+      # Uses Docker internal network (service name), not localhost.
       API_BASE_URL: http://api:8000
     ports:
-      - "80:8501"
+      - "80:8501"      # Serve on port 80 so users hit http://<IP> (no port in URL)
     depends_on:
       api:
         condition: service_healthy
     networks:
       - podcast_network
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # PROMETHEUS — Metrics collection (optional, behind profile flag)
+  # Start with: docker compose -f docker-compose.prod.yml --profile monitoring up -d
+  # ─────────────────────────────────────────────────────────────────────────
   prometheus:
     profiles: ["monitoring"]
     image: prom/prometheus:latest
+    container_name: podcast_prometheus
     restart: unless-stopped
     ports:
-      - "127.0.0.1:9090:9090"
+      - "127.0.0.1:9090:9090"    # Localhost only — not exposed publicly
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -92,12 +153,16 @@ services:
     networks:
       - podcast_network
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # GRAFANA — Metrics visualisation (optional, behind profile flag)
+  # ─────────────────────────────────────────────────────────────────────────
   grafana:
     profiles: ["monitoring"]
     image: grafana/grafana:latest
+    container_name: podcast_grafana
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3000:3000"    # Localhost only — SSH tunnel to view
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
@@ -105,12 +170,21 @@ services:
     networks:
       - podcast_network
 
+# ─────────────────────────────────────────────────────────────────────────────
+# VOLUMES — All named volumes persist across `docker compose down` + `up`
+# ─────────────────────────────────────────────────────────────────────────────
 volumes:
   ollama_data:
-    name: podcast_agent_ollama_data
+    name: podcast_agent_ollama_data    # Ollama model weights (~270 MB)
   prometheus_data:
+    name: podcast_agent_prometheus_data
   grafana_data:
+    name: podcast_agent_grafana_data
 
+# ─────────────────────────────────────────────────────────────────────────────
+# NETWORKS
+# ─────────────────────────────────────────────────────────────────────────────
 networks:
   podcast_network:
     name: podcast_agent_production_network
+    driver: bridge
