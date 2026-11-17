@@ -52,7 +52,6 @@ from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_groq import ChatGroq
 from langgraph.prebuilt import create_react_agent
-from sentence_transformers import CrossEncoder
 
 from graph.state import GraphState
 from graph.tools import search_vectorstore, search_web
@@ -75,13 +74,31 @@ _chroma_client_check = chromadb.PersistentClient(path="./.chroma")
 # WHY SINGLETON (not per-call):
 #   We still only want ONE model loaded in RAM. The getter caches after first
 #   call. CrossEncoder.predict() is stateless and thread-safe for inference.
-_CROSS_ENCODER: CrossEncoder = None
+#
+# WHY IMPORT IS INSIDE THE GETTER (not at module top):
+#   sentence-transformers pulls in torch + transformers (~2 GB). Moving the
+#   import inside the lazy getter means:
+#     1. `from graph.nodes.retrieve_blog_chunks import retrieve_blog_chunks`
+#        works in CI/test environments where sentence-transformers is not yet
+#        installed (import-time safety).
+#     2. If sentence-transformers IS installed, the first actual reranking call
+#        will load the model — same runtime behaviour as before.
+_CROSS_ENCODER = None  # type: ignore[assignment]  # actual type: Optional[CrossEncoder]
 
 
-def _get_cross_encoder() -> CrossEncoder:
-    """Return the cached CrossEncoder, loading it on first call."""
+def _get_cross_encoder():
+    """Return the cached CrossEncoder, loading it on first call.
+
+    The import is performed here (not at module top) so that the module can
+    be safely imported in CI environments where sentence-transformers is not
+    installed. The model is only downloaded on the first inference call.
+    """
     global _CROSS_ENCODER
     if _CROSS_ENCODER is None:
+        # Deferred import: keeps sentence-transformers (+ torch) out of the
+        # module-level import graph so the API can start without it.
+        from sentence_transformers import CrossEncoder  # noqa: PLC0415
+
         logger.info("Loading CrossEncoder model BAAI/bge-reranker-base (first call)...")
         _CROSS_ENCODER = CrossEncoder("BAAI/bge-reranker-base")
         logger.info("CrossEncoder model loaded successfully.")
