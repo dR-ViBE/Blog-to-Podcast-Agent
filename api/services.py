@@ -20,14 +20,13 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-
+import mlflow
 from langchain_core.runnables import RunnableConfig
 from langsmith import traceable
-import mlflow
 
 from api.metrics import METRICS
 from api.models import FilterOptions, PodcastResponse
-from api.security import pii_guard, check_prompt_injection
+from api.security import check_prompt_injection, pii_guard
 from graph.graph import app as langgraph_app
 from graph.prompts.loader import get_all_active_versions
 
@@ -274,7 +273,9 @@ def run_podcast_agent(
         # Web search is offered as a SUPPLEMENT to existing content, not a replacement.
         web_search_required = final_state.get("web_search_required", False)
         if web_search_required and not web_search_approved:
-            logger.info("Pipeline paused | requires supplemental web search approval | query=%r", query)
+            logger.info(
+                "Pipeline paused | requires supplemental web search approval | query=%r", query
+            )
             if mlflow_run:
                 try:
                     mlflow.log_param("status", "requires_approval")
@@ -393,12 +394,12 @@ def run_podcast_agent(
             mlflow.log_metric("total_tokens_used", total_tokens_used)
             mlflow.log_metric("generation_count", generation_count)
             mlflow.log_metric("is_acceptable", 1.0 if is_accepted else 0.0)
-            
+
             script = final_state.get("script", "")
             if script:
                 mlflow.log_text(script, "generated_script.txt")
                 mlflow.log_metric("script_word_count", len(script.split()))
-            
+
             # Safely extract evaluation grade (supports dict, json string, or raw string)
             eval_score = 0.0
             eval_data = final_state.get("script_evaluation")
@@ -407,6 +408,7 @@ def run_podcast_agent(
             elif isinstance(eval_data, str):
                 try:
                     import json
+
                     parsed_eval = json.loads(eval_data)
                     if isinstance(parsed_eval, dict):
                         eval_score = parsed_eval.get("grade_score", 0.0)
@@ -416,7 +418,7 @@ def run_podcast_agent(
                     except ValueError:
                         pass
             mlflow.log_metric("eval_grade_score", float(eval_score or 0.0))
-            
+
             mlflow.end_run()
         except Exception as mlflow_log_exc:
             logger.warning("Failed to log final run data to MLflow: %s", mlflow_log_exc)

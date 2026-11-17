@@ -146,7 +146,13 @@ def make_ingest_request(
     try:
         if file_data:
             filename, file_bytes = file_data
-            files = {"file": (filename, file_bytes, "application/pdf" if filename.endswith(".pdf") else "text/plain")}
+            files = {
+                "file": (
+                    filename,
+                    file_bytes,
+                    "application/pdf" if filename.endswith(".pdf") else "text/plain",
+                )
+            }
             data = {"user_id": user_id}
             response = requests.post(api_url, files=files, data=data, timeout=120)
         elif url_str:
@@ -172,7 +178,6 @@ def make_ingest_request(
 
     except Exception as exc:
         return {"success": False, "error": f"Ingestion request failed: {exc}"}
-
 
 
 def fetch_audio_bytes(base_url: str, filename: str) -> dict:
@@ -260,6 +265,5 @@ def fetch_analytics(base_url: str) -> dict:
     except Exception as exc:
         return {
             "success": False,
-            "error": f"Could not retrieve analytics metrics from backend: {exc}"
+            "error": f"Could not retrieve analytics metrics from backend: {exc}",
         }
-

@@ -28,7 +28,6 @@ COST:
 from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 
-
 # Initialise once at module load — not inside the function, to avoid
 # re-creating the client on every tool call.
 _tavily_search = TavilySearch(max_results=2)

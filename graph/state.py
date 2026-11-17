@@ -17,9 +17,9 @@
 #   Audio    → reads "script",                                   writes "audio_output"
 
 from typing import List, Optional
-from typing_extensions import TypedDict
-from langchain_core.documents import Document
 
+from langchain_core.documents import Document
+from typing_extensions import TypedDict
 
 
 class GraphState(TypedDict):
@@ -60,36 +60,40 @@ class GraphState(TypedDict):
 
     url: str
     query: str
-    source_filter: Optional[str]           # Phase 1: optional ChromaDB source URL/path filter
-    source_type_filter: Optional[str]      # Phase 1: optional source type filter (url/pdf/text)
+    source_filter: Optional[str]  # Phase 1: optional ChromaDB source URL/path filter
+    source_type_filter: Optional[str]  # Phase 1: optional source type filter (url/pdf/text)
     user_id: str
     web_search_approved: bool
     web_search_required: bool
     documents: List[Document]
-    episode_outline: Optional[dict]         # Planner Agent output
-    retrieval_strategy: Optional[dict]      # Retriever Agent tool-use summary
+    episode_outline: Optional[dict]  # Planner Agent output
+    retrieval_strategy: Optional[dict]  # Retriever Agent tool-use summary
     script: str
-    is_acceptable: bool                     # Backward compat: True iff editor_action == "accept"
-    script_evaluation: str                  # Backward compat: same as editor_notes
-    editor_action: Optional[str]            # Phase 2: triadic routing ("accept" | "revise_script" | "request_more_context")
-    editor_notes: Optional[str]             # Phase 2: detailed Editor feedback
-    context_gaps: Optional[str]             # Phase 2: topics for Retriever when request_more_context
+    is_acceptable: bool  # Backward compat: True iff editor_action == "accept"
+    script_evaluation: str  # Backward compat: same as editor_notes
+    editor_action: Optional[
+        str
+    ]  # Phase 2: triadic routing ("accept" | "revise_script" | "request_more_context")
+    editor_notes: Optional[str]  # Phase 2: detailed Editor feedback
+    context_gaps: Optional[str]  # Phase 2: topics for Retriever when request_more_context
     improvement_suggestions: str
     generation_count: int
     max_generations: int
     audio_output: str
     # ── Cost & Token Tracking (Phase 1) ──────────────────────────────────────
-    llm_cost_usd: float                     # Cumulative estimated USD cost for this run
-    total_tokens_used: int                  # Cumulative estimated token count (prompt + completion)
+    llm_cost_usd: float  # Cumulative estimated USD cost for this run
+    total_tokens_used: int  # Cumulative estimated token count (prompt + completion)
     # ── PII Tracking (Phase 1) ───────────────────────────────────────────────
-    pii_was_masked: bool                    # True if query PII was masked before graph invocation
-    pii_entities_found: List[str]           # Entity types masked (e.g. ["PERSON", "EMAIL_ADDRESS"])
+    pii_was_masked: bool  # True if query PII was masked before graph invocation
+    pii_entities_found: List[str]  # Entity types masked (e.g. ["PERSON", "EMAIL_ADDRESS"])
     # ── Checkpoint Tracking (Phase 2 #6) ────────────────────────────────────
-    checkpoint_thread_id: Optional[str]     # Unique key for LangGraph SQLite checkpoint (deterministic replay)
+    checkpoint_thread_id: Optional[
+        str
+    ]  # Unique key for LangGraph SQLite checkpoint (deterministic replay)
     # ── Retrieval Failure Reason (Change 3: Relevance Gate) ──────────────────
     retrieval_failure_reason: Optional[str]  # Set when initial retrieval yields no documents.
-                                             # Possible values:
-                                             #   "no_documents_ingested" – user has no content in DB at all
-                                             #   "no_matching_content"   – docs exist but none match query
-                                             # When set, route_after_retrieval routes to END immediately
-                                             # (fail-fast) instead of offering web search.
+    # Possible values:
+    #   "no_documents_ingested" – user has no content in DB at all
+    #   "no_matching_content"   – docs exist but none match query
+    # When set, route_after_retrieval routes to END immediately
+    # (fail-fast) instead of offering web search.

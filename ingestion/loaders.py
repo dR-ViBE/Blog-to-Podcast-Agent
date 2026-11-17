@@ -52,6 +52,7 @@ CHUNK_SIZE = 300  # tokens — same as the original ingestion.py
 CHUNK_OVERLAP = 50  # tokens — 50-token overlap preserves sentence boundaries
 
 import logging
+
 import chromadb as _chromadb
 
 _logger = logging.getLogger(__name__)
@@ -294,15 +295,18 @@ def ingest_source(source: str, user_id: str = "default_user") -> int:
             limit=1,
         )
         if existing and existing.get("ids"):
-            existing_count = _col.count()  # approximate — exact per-source count not cheap
             # Get accurate count for this source
             all_for_source = _col.get(
-                where={"$and": [{"source": {"$eq": primary_source}}, {"user_id": {"$eq": user_id}}]},
+                where={
+                    "$and": [{"source": {"$eq": primary_source}}, {"user_id": {"$eq": user_id}}]
+                },
             )
             source_chunk_count = len(all_for_source.get("ids", []))
             _logger.info(
                 "Dedup: source '%s' already ingested for user '%s' (%d chunks). Skipping re-ingestion.",
-                primary_source, user_id, source_chunk_count,
+                primary_source,
+                user_id,
+                source_chunk_count,
             )
             print(f"  [DEDUP] Source already ingested ({source_chunk_count} chunks). Skipping.")
             return source_chunk_count

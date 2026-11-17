@@ -65,12 +65,11 @@ try:
     # SqliteSaver requires langgraph-checkpoint-sqlite installed separately.
     # On langgraph 1.0.5 this means langgraph-checkpoint-sqlite < 2.0.
     import contextlib
+
     from langgraph.checkpoint.sqlite import SqliteSaver as _SqliteSaver
 
     _exit_stack = contextlib.ExitStack()
-    _checkpointer = _exit_stack.enter_context(
-        _SqliteSaver.from_conn_string(_CHECKPOINT_DB_PATH)
-    )
+    _checkpointer = _exit_stack.enter_context(_SqliteSaver.from_conn_string(_CHECKPOINT_DB_PATH))
     _CHECKPOINTER_AVAILABLE = True
     _CHECKPOINTER_TYPE = "SqliteSaver"
     logger.info(
@@ -83,6 +82,7 @@ except (ImportError, ModuleNotFoundError):
     # langgraph version. Use MemorySaver as the in-process checkpointer.
     try:
         from langgraph.checkpoint.memory import MemorySaver as _MemorySaver
+
         _checkpointer = _MemorySaver()
         _CHECKPOINTER_TYPE = "MemorySaver"
         logger.info(
@@ -92,17 +92,14 @@ except (ImportError, ModuleNotFoundError):
             "langgraph-checkpoint-sqlite version."
         )
     except Exception as mem_exc:
-        logger.warning(
-            "MemorySaver initialisation failed (%s). Checkpointing disabled.", mem_exc
-        )
+        logger.warning("MemorySaver initialisation failed (%s). Checkpointing disabled.", mem_exc)
 
 except Exception as _e:
     # Catch any other errors (e.g. DB locked, permission error) and fall back
-    logger.warning(
-        "SqliteSaver initialisation failed (%s). Falling back to MemorySaver.", _e
-    )
+    logger.warning("SqliteSaver initialisation failed (%s). Falling back to MemorySaver.", _e)
     try:
         from langgraph.checkpoint.memory import MemorySaver as _MemorySaver
+
         _checkpointer = _MemorySaver()
         _CHECKPOINTER_TYPE = "MemorySaver (fallback)"
     except Exception:
@@ -112,6 +109,7 @@ except Exception as _e:
 # ---------------------------------------------------------------------------
 # PUBLIC API
 # ---------------------------------------------------------------------------
+
 
 def get_checkpointer():
     """

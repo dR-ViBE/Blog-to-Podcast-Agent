@@ -7,7 +7,7 @@
 #   In production systems, assigning version numbers manually (like v1, v2)
 #   creates merge conflicts and clashing versions when multiple developers
 #   work in parallel.
-#   
+#
 #   Instead, this loader calculates a unique cryptographic hash of the prompt's
 #   text content at runtime. This hash acts as the version ID.
 #   - If content changes, the version changes automatically.
@@ -25,6 +25,7 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
+
 import mlflow
 from mlflow.tracking import MlflowClient
 
@@ -90,9 +91,7 @@ def load_prompt(name: str, version: str | None = None) -> str:
         file_path = _PROMPTS_DIR / f"{name}_v1.txt"
 
     if not file_path.exists():
-        raise FileNotFoundError(
-            f"Prompt file '{name}.txt' not found in {_PROMPTS_DIR}."
-        )
+        raise FileNotFoundError(f"Prompt file '{name}.txt' not found in {_PROMPTS_DIR}.")
 
     local_text = file_path.read_text(encoding="utf-8").strip()
     computed_version = get_content_hash(local_text)
@@ -118,7 +117,7 @@ def load_prompt(name: str, version: str | None = None) -> str:
             runs = client.search_runs(
                 experiment_ids=[experiment_id],
                 filter_string=f"tags.mlflow.runName = '{run_name}'",
-                max_results=1
+                max_results=1,
             )
 
             if runs:
@@ -126,7 +125,9 @@ def load_prompt(name: str, version: str | None = None) -> str:
                 local_file = client.download_artifacts(run.info.run_id, "prompt.txt")
                 with open(local_file, "r", encoding="utf-8") as f:
                     mlflow_text = f.read().strip()
-                logger.info("Loaded prompt from MLflow Registry | name=%s | version=%s", name, version)
+                logger.info(
+                    "Loaded prompt from MLflow Registry | name=%s | version=%s", name, version
+                )
                 return mlflow_text
             else:
                 logger.info("Registering prompt in MLflow | runName=%s", run_name)

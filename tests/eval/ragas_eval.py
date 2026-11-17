@@ -192,7 +192,7 @@ def run_full_pipeline(query: str) -> tuple:
 
         initial_state = {
             "query": query,
-            "max_generations": 1,   # Single generation for eval efficiency
+            "max_generations": 1,  # Single generation for eval efficiency
             "generation_count": 0,
             "source_filter": None,
             "source_type_filter": None,
@@ -249,7 +249,9 @@ def evaluate(retrieval_only: bool = False):
     """
     print("=" * 65)
     print("  RAGAS Evaluation — Blog-to-Podcast RAG Pipeline")
-    print(f"  Mode: {'Retrieval Only' if retrieval_only else 'Full Pipeline (includes generation metrics)'}")
+    print(
+        f"  Mode: {'Retrieval Only' if retrieval_only else 'Full Pipeline (includes generation metrics)'}"
+    )
     print("=" * 65)
 
     with open(GOLDEN_DATASET_PATH) as f:
@@ -278,18 +280,22 @@ def evaluate(retrieval_only: bool = False):
         else:
             try:
                 contexts, script = run_full_pipeline(query)
-                print(f"    → Retrieved {len(contexts)} chunks | script={len(script.split())} words")
+                print(
+                    f"    → Retrieved {len(contexts)} chunks | script={len(script.split())} words"
+                )
             except Exception as e:
                 print(f"    [WARNING] Pipeline failed: {e}")
                 contexts, script = [], ""
 
-        samples.append({
-            "user_input": query,
-            "retrieved_contexts": contexts,
-            "reference": " ".join(ground_truths),
-            "response": script or "(generation skipped)",
-            "query_type": query_type,
-        })
+        samples.append(
+            {
+                "user_input": query,
+                "retrieved_contexts": contexts,
+                "reference": " ".join(ground_truths),
+                "response": script or "(generation skipped)",
+                "query_type": query_type,
+            }
+        )
 
     # ── Run RAGAS scoring ─────────────────────────────────────────────────────
     print("\nRunning RAGAS scoring (LLM-as-judge via Groq)...")
@@ -300,7 +306,7 @@ def evaluate(retrieval_only: bool = False):
         from langchain_ollama import OllamaEmbeddings
         from ragas import EvaluationDataset, SingleTurnSample
         from ragas import evaluate as ragas_evaluate
-        from ragas.metrics import ContextPrecision, ContextRecall, ContextEntityRecall
+        from ragas.metrics import ContextEntityRecall, ContextPrecision, ContextRecall
         from ragas.run_config import RunConfig
 
         judge_llm = ChatGroq(model="openai/gpt-oss-20b")
@@ -326,6 +332,7 @@ def evaluate(retrieval_only: bool = False):
         if not retrieval_only:
             try:
                 from ragas.metrics import AnswerRelevancy, Faithfulness, NoiseSensitivity
+
                 metrics.extend([AnswerRelevancy(), Faithfulness(), NoiseSensitivity()])
                 print("Running all 6 metrics (retrieval + generation).")
             except ImportError as e:
@@ -355,8 +362,12 @@ def evaluate(retrieval_only: bool = False):
         summary = {}
 
         all_metric_names = [
-            "context_precision", "context_recall", "context_entity_recall",
-            "answer_relevancy", "faithfulness", "noise_sensitivity",
+            "context_precision",
+            "context_recall",
+            "context_entity_recall",
+            "answer_relevancy",
+            "faithfulness",
+            "noise_sensitivity",
         ]
 
         for metric in all_metric_names:

@@ -65,11 +65,14 @@ def generate_audio(state: GraphState) -> Dict:
             logger.info("Audio saved to: %s (via ElevenLabs)", output_path)
 
         except Exception as e:
-            logger.warning("ElevenLabs TTS failed or quota exceeded: %s. Falling back to free gTTS...", e)
+            logger.warning(
+                "ElevenLabs TTS failed or quota exceeded: %s. Falling back to free gTTS...", e
+            )
             try:
                 from gtts import gTTS
+
                 # Generate audio using free Google Translate TTS API (no keys needed)
-                tts = gTTS(text=script, lang='en', tld='com')
+                tts = gTTS(text=script, lang="en", tld="com")
                 tts.save(output_path)
                 logger.info("Audio saved to: %s (via free gTTS fallback)", output_path)
             except Exception as fallback_exc:

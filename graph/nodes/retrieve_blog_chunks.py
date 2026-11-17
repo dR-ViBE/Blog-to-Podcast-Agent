@@ -54,8 +54,8 @@ from langchain_groq import ChatGroq
 from langgraph.prebuilt import create_react_agent
 from sentence_transformers import CrossEncoder
 
-from graph.tools import search_vectorstore, search_web
 from graph.state import GraphState
+from graph.tools import search_vectorstore, search_web
 from graph.utils.node_metrics import NodeTimer
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,9 @@ def _get_cross_encoder() -> CrossEncoder:
 # ─── Retriever Agent Setup ────────────────────────────────────────────────────
 # The LLM is given both tools. Its docstrings tell it when to use each one.
 # openai/gpt-oss-20b supports tool calling via Groq's API.
-_retriever_llm = ChatGroq(model="openai/gpt-oss-20b", max_tokens=2500).with_fallbacks([ChatGroq(model="openai/gpt-oss-120b", max_tokens=2500)])
+_retriever_llm = ChatGroq(model="openai/gpt-oss-20b", max_tokens=2500).with_fallbacks(
+    [ChatGroq(model="openai/gpt-oss-120b", max_tokens=2500)]
+)
 _retriever_tools = [search_vectorstore, search_web]
 
 # create_react_agent returns a compiled LangGraph sub-graph.
@@ -147,12 +149,14 @@ def _extract_docs_from_agent_messages(messages: list) -> List[Document]:
                     if chunk.startswith("[Source:"):
                         end_bracket = chunk.find("]")
                         if end_bracket > 0:
-                            source = chunk[len("[Source:"):end_bracket].strip()
-                            chunk = chunk[end_bracket + 1:].strip()
-                    documents.append(Document(
-                        page_content=chunk,
-                        metadata={"source": source, "retriever": "agent"},
-                    ))
+                            source = chunk[len("[Source:") : end_bracket].strip()
+                            chunk = chunk[end_bracket + 1 :].strip()
+                    documents.append(
+                        Document(
+                            page_content=chunk,
+                            metadata={"source": source, "retriever": "agent"},
+                        )
+                    )
     return documents
 
 
@@ -230,11 +234,9 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
     # Phase 2 (#10): NodeTimer records retrieve latency to Prometheus.
     with NodeTimer("retrieve"):
         agent_result = dynamic_agent.invoke(
-            {"messages": [("user", agent_input)]},
-            {"recursion_limit": 4}
+            {"messages": [("user", agent_input)]}, {"recursion_limit": 4}
         )
     all_messages = agent_result.get("messages", [])
-
 
     # ── Extract documents from tool call results ───────────────────────────────
     raw_docs = _extract_docs_from_agent_messages(all_messages)
@@ -336,8 +338,7 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
             else:
                 retrieval_failure_reason = "no_documents_ingested"
                 logger.info(
-                    "Initial retrieval empty — user has NO documents ingested | "
-                    "user_id=%r",
+                    "Initial retrieval empty — user has NO documents ingested | user_id=%r",
                     state.get("user_id", "default_user"),
                 )
 

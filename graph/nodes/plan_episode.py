@@ -42,7 +42,6 @@ from graph.state import GraphState
 from graph.utils.node_metrics import NodeTimer
 
 
-
 def plan_episode(state: GraphState, config: RunnableConfig = None) -> Dict:
     """
     LangGraph node: Analyzes retrieved blog content and produces a structured
@@ -74,7 +73,9 @@ def plan_episode(state: GraphState, config: RunnableConfig = None) -> Dict:
     # Concatenate all retrieved chunks into a single text block for the planner.
     # The planner uses this as the SOLE source of truth for planning talking points.
     context = "\n\n".join(
-        doc.page_content for doc in documents if isinstance(doc, Document) and doc.page_content.strip()
+        doc.page_content
+        for doc in documents
+        if isinstance(doc, Document) and doc.page_content.strip()
     )
     if not context:
         # Defensive fallback: if documents are present but all empty, signal the topic
@@ -121,4 +122,3 @@ def plan_episode(state: GraphState, config: RunnableConfig = None) -> Dict:
     outline_dict = outline.model_dump()
 
     return {"episode_outline": outline_dict}
-

@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
 
-from graph.prompts.loader import load_prompt, get_prompt_version
+from graph.prompts.loader import get_prompt_version, load_prompt
 
 
 class RetrievalStrategy(BaseModel):
@@ -24,7 +24,9 @@ class RetrievalStrategy(BaseModel):
     )
 
 
-llm = ChatGroq(model="openai/gpt-oss-20b", max_tokens=2500).with_fallbacks([ChatGroq(model="openai/gpt-oss-120b", max_tokens=2500)])
+llm = ChatGroq(model="openai/gpt-oss-20b", max_tokens=2500).with_fallbacks(
+    [ChatGroq(model="openai/gpt-oss-120b", max_tokens=2500)]
+)
 structured_retriever_llm = llm.with_structured_output(RetrievalStrategy)
 
 # ─── Load Versioned Prompt ───────────────────────────────────────────────────

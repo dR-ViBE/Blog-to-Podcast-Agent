@@ -30,7 +30,7 @@ from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 
 from graph.chains.outline_model import EpisodeOutline
-from graph.prompts.loader import load_prompt, get_prompt_version
+from graph.prompts.loader import get_prompt_version, load_prompt
 
 # ─── LLM Configuration (Two-Tier Fallback) ──────────────────────────────────
 # Tier 1 (Primary)  : Groq openai/gpt-oss-20b — fast, tool-calling, structured output.
@@ -73,4 +73,3 @@ planner_prompt = ChatPromptTemplate.from_messages(
 # ─── Assembled Chain ─────────────────────────────────────────────────────────
 # planner_prompt → structured_planner_llm → EpisodeOutline
 planner_chain = planner_prompt | structured_planner_llm
-

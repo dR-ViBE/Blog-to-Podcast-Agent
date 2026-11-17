@@ -15,7 +15,6 @@ from graph.state import GraphState
 from graph.utils.node_metrics import NodeTimer
 
 
-
 def suggest_imporvements(state: GraphState, config: RunnableConfig = None) -> Dict:
     """
     LangGraph node: Generates editor-style improvement instructions for a
@@ -66,4 +65,3 @@ def suggest_imporvements(state: GraphState, config: RunnableConfig = None) -> Di
         )
 
     return {"improvement_suggestions": suggestions}
-

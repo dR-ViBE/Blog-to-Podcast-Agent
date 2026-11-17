@@ -8,7 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 
-from graph.prompts.loader import load_prompt, get_prompt_version
+from graph.prompts.loader import get_prompt_version, load_prompt
 
 # ─── LLM Configuration (Two-Tier Fallback) ──────────────────────────────────
 # Tier 1 (Primary)  : Groq openai/gpt-oss-20b — fast, tool-calling capable, active.

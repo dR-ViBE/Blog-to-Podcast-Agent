@@ -73,6 +73,11 @@ ignore = [
     "W293",   # whitespace before comment
 ]
 
+[tool.ruff.format]
+# ruff format is NOT used in CI (black is the canonical formatter).
+# This section only applies when running `ruff format` locally.
+# Exclude test files to prevent style conflicts with black on assert statements.
+exclude = ["tests/*"]
 
 # ─── Black (formatting) ───────────────────────────────────────────────────────
 [tool.black]

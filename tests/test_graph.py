@@ -131,9 +131,9 @@ class TestGraphCompilation:
         """Compiled LangGraph apps expose .get_graph() for introspection."""
         from graph.graph import app
 
-        assert hasattr(app, "get_graph"), (
-            "Compiled graph must have .get_graph() for LangSmith diagram generation"
-        )
+        assert hasattr(
+            app, "get_graph"
+        ), "Compiled graph must have .get_graph() for LangSmith diagram generation"
 
     def test_graph_nodes_exist(self):
         """The compiled graph must contain the five expected nodes."""
@@ -159,9 +159,9 @@ class TestGraphCompilation:
         }
         # Check that all expected nodes are present (there may be extra __start__/__end__ nodes)
         missing_nodes = expected_nodes - node_names
-        assert not missing_nodes, (
-            f"Graph is missing expected nodes: {missing_nodes}. Found: {node_names}"
-        )
+        assert (
+            not missing_nodes
+        ), f"Graph is missing expected nodes: {missing_nodes}. Found: {node_names}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -198,9 +198,9 @@ class TestDecideNextStep:
             "max_generations": 3,
         }
         result = decide_next_step(state)
-        assert result == SUGGEST_IMPROVEMENTS, (
-            f"Expected SUGGEST_IMPROVEMENTS when rejected under limit, got: {result}"
-        )
+        assert (
+            result == SUGGEST_IMPROVEMENTS
+        ), f"Expected SUGGEST_IMPROVEMENTS when rejected under limit, got: {result}"
 
     def test_rejected_at_limit_routes_to_end(self):
         """When rejected AND at max retries, the graph must route to END."""

@@ -57,6 +57,7 @@ logger = logging.getLogger(__name__)
 # already set (e.g. by Docker or the OS), we respect the existing value.
 # ---------------------------------------------------------------------------
 
+
 def _ensure_prometheus_multiproc_dir() -> bool:
     """
     Ensures PROMETHEUS_MULTIPROC_DIR is set and the directory exists.
@@ -91,12 +92,12 @@ def _ensure_prometheus_multiproc_dir() -> bool:
 _MULTIPROC_ACTIVE = _ensure_prometheus_multiproc_dir()
 
 # Now safe to import prometheus_client — it reads PROMETHEUS_MULTIPROC_DIR here
-from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, REGISTRY
-
+from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histogram
 
 # ---------------------------------------------------------------------------
 # METRIC DEFINITIONS
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PodcastMetrics:

@@ -39,11 +39,11 @@ logger = logging.getLogger(__name__)
 GROQ_PRICING: dict = {
     # Active models (Oct 2026)
     "openai/gpt-oss-20b": {
-        "input": 0.10,   # USD per million input tokens (estimate until Groq publishes)
+        "input": 0.10,  # USD per million input tokens (estimate until Groq publishes)
         "output": 0.15,  # USD per million output tokens (estimate)
     },
     "openai/gpt-oss-120b": {
-        "input": 0.50,   # USD per million input tokens (estimate)
+        "input": 0.50,  # USD per million input tokens (estimate)
         "output": 0.75,  # USD per million output tokens (estimate)
     },
     "qwen/qwen3.8-27b": {

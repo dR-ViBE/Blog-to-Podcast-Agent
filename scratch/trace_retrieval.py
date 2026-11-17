@@ -4,10 +4,11 @@ import sys
 from pathlib import Path
 
 # Set system console encoding to utf-8 to prevent cp1252 errors on Windows
-sys.stdout.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding="utf-8")
 
 # Load environment variables before importing graph packages to ensure API keys are set
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Add project root to path
@@ -37,6 +38,7 @@ search_queries = []
 try:
     print("\n[Step 1] Planning outline using planner_chain...")
     from graph.chains.planner_chain import planner_chain
+
     outline = planner_chain.invoke({"query": query})
     print(f"  Generated Outline: '{outline.episode_title}'")
 
@@ -53,7 +55,7 @@ except Exception as e:
     search_queries = [
         "What are the challenges of traditional trajectory planners on complex hydraulic excavators?",
         "Why are hydraulic excavators difficult to model analytically?",
-        "Excavator dynamics machine-specific nonlinear trajectory planning challenges"
+        "Excavator dynamics machine-specific nonlinear trajectory planning challenges",
     ]
 
 print(f"\nUsing {len(search_queries)} search queries for ChromaDB:")
@@ -97,5 +99,5 @@ print(f"\n--- RERANKED CHUNKS (Top {FINAL_TOP_K}) ---")
 for idx, (doc, score) in enumerate(scored[:FINAL_TOP_K], 1):
     print(f"\n[{idx}] Score: {score:.4f} | Page: {doc.metadata.get('page', 'Unknown')}")
     print(f"    Source: {doc.metadata.get('source', 'Unknown')}")
-    snippet = doc.page_content[:400].replace('\n', ' ')
+    snippet = doc.page_content[:400].replace("\n", " ")
     print(f"    Content: {snippet}...")

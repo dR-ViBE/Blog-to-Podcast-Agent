@@ -22,7 +22,6 @@ from graph.state import GraphState
 from graph.utils.node_metrics import NodeTimer
 
 
-
 def grade_script(state: GraphState, config: RunnableConfig = None) -> Dict:
     """
     LangGraph node: Editor Agent — grades the script and decides what happens next.
@@ -61,13 +60,11 @@ def grade_script(state: GraphState, config: RunnableConfig = None) -> Dict:
     with NodeTimer("grade_script"):
         result = script_grader.invoke({"script": script}, config=node_config)
 
-
     return {
         # Primary routing field — decide_next_step reads this
         "editor_action": result.action,
         "editor_notes": result.notes,
         "context_gaps": result.context_gaps,  # populated only for request_more_context
-
         # Kept for backward compatibility with existing state fields and tests
         "is_acceptable": result.action == "accept",
         "script_evaluation": result.notes,

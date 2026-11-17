@@ -152,9 +152,15 @@ class PodcastResponse(BaseModel):
         sources_used:            Unique source URLs/paths that contributed documents.
     """
 
-    status: str = Field(description="Indicates whether the pipeline succeeded or requires approval.")
-    message: Optional[str] = Field(default=None, description="Descriptive message for human approval.")
-    web_search_required: bool = Field(default=False, description="True if local DB was empty and web search approval is needed.")
+    status: str = Field(
+        description="Indicates whether the pipeline succeeded or requires approval."
+    )
+    message: Optional[str] = Field(
+        default=None, description="Descriptive message for human approval."
+    )
+    web_search_required: bool = Field(
+        default=False, description="True if local DB was empty and web search approval is needed."
+    )
     script: Optional[str] = Field(default=None, description="The final podcast script.")
     audio_path: Optional[str] = Field(
         default=None,

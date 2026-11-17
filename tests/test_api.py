@@ -57,9 +57,12 @@ class TestRootEndpoint:
         # follow_redirects=False so we can inspect the redirect response itself
         response = fastapi_client.get("/", follow_redirects=False)
         # FastAPI's RedirectResponse defaults to 307 Temporary Redirect
-        assert response.status_code in (301, 302, 307, 308), (
-            f"Expected a redirect status code, got {response.status_code}"
-        )
+        assert response.status_code in (
+            301,
+            302,
+            307,
+            308,
+        ), f"Expected a redirect status code, got {response.status_code}"
 
     def test_root_redirects_to_docs(self, fastapi_client):
         """Root redirect must point to /docs."""

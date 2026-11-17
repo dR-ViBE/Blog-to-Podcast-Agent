@@ -1,6 +1,6 @@
 from langgraph.graph import END
 
-from graph.consts import GENERATE_AUDIO, SUGGEST_IMPROVEMENTS, RETRIEVE
+from graph.consts import GENERATE_AUDIO, RETRIEVE, SUGGEST_IMPROVEMENTS
 from graph.state import GraphState
 
 
@@ -22,4 +22,3 @@ def decide_next_step(state: GraphState):
             return SUGGEST_IMPROVEMENTS
     else:
         return END
-

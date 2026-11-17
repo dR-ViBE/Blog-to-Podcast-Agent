@@ -20,8 +20,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, File, UploadFile, Form
-
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from api.metrics import METRICS
@@ -75,7 +74,7 @@ def get_analytics():
     """
     Scrapes the local prometheus registry and returns the values of all custom
     metrics starting with 'podcast_' as a structured JSON object.
-    
+
     This allows non-technical users to view metrics as a beautiful dashboard
     in our Streamlit frontend, without requiring a separate Grafana/Prometheus setup.
 
@@ -84,13 +83,14 @@ def get_analytics():
     on-disk .db snapshots) are included. Without this, the analytics endpoint would
     only see in-process metrics and return empty histograms for node_duration etc.
     """
-    import os
-    from prometheus_client import CollectorRegistry, REGISTRY
+
+    from prometheus_client import REGISTRY, CollectorRegistry
 
     # Decide which registry to collect from
     if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
         # Multiprocess mode — read from on-disk .db snapshot files
         from prometheus_client import multiprocess
+
         registry = CollectorRegistry()
         multiprocess.MultiProcessCollector(registry)
     else:
@@ -102,18 +102,15 @@ def get_analytics():
         if metric.name.startswith("podcast_"):
             samples = []
             for sample in metric.samples:
-                samples.append({
-                    "name": sample.name,
-                    "labels": sample.labels,
-                    "value": sample.value
-                })
+                samples.append(
+                    {"name": sample.name, "labels": sample.labels, "value": sample.value}
+                )
             data[metric.name] = {
                 "documentation": metric.documentation,
                 "type": metric.type,
-                "samples": samples
+                "samples": samples,
             }
     return data
-
 
 
 # ---------------------------------------------------------------------------
@@ -134,19 +131,19 @@ def get_chunks_view():
     the vector database, then returns the HTML file to be displayed in the browser.
     """
     from scratch.export_chroma_chunks_html import main as export_chunks
+
     try:
         export_chunks()
     except Exception as exc:
         logger.error("Failed to export ChromaDB chunks: %s", exc)
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate ChromaDB chunks view: {exc}"
+            status_code=500, detail=f"Failed to generate ChromaDB chunks view: {exc}"
         )
-    
+
     html_path = Path("outputs/chroma_chunks_view.html")
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Chroma chunks view HTML file not found.")
-        
+
     return FileResponse(html_path)
 
 
@@ -215,7 +212,7 @@ def generate_podcast(request: PodcastRequest) -> PodcastResponse:
 
     if pii_guard.is_available:
         masked_query, pii_entities_found = pii_guard.mask_text(request.query)
-        pii_was_masked = (masked_query != request.query)
+        pii_was_masked = masked_query != request.query
 
         if pii_was_masked:
             logger.info(
@@ -363,9 +360,12 @@ def ingest_data(
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine source_type for Prometheus label
-    source_type = "url" if url else (
-        "pdf" if file and file.filename and file.filename.lower().endswith(".pdf")
-        else "text"
+    source_type = (
+        "url"
+        if url
+        else (
+            "pdf" if file and file.filename and file.filename.lower().endswith(".pdf") else "text"
+        )
     )
 
     if file:
@@ -377,9 +377,7 @@ def ingest_data(
             chunks = ingest_source(str(file_path), user_id=user_id)
 
             METRICS.ingestion_chunks_total.labels(source_type=source_type).inc(chunks)
-            METRICS.ingestion_requests_total.labels(
-                source_type=source_type, status="success"
-            ).inc()
+            METRICS.ingestion_requests_total.labels(source_type=source_type, status="success").inc()
 
             return {
                 "status": "success",
@@ -389,18 +387,14 @@ def ingest_data(
                 "source_type": source_type,
             }
         except ValueError as exc:
-            METRICS.ingestion_requests_total.labels(
-                source_type=source_type, status="failed"
-            ).inc()
+            METRICS.ingestion_requests_total.labels(source_type=source_type, status="failed").inc()
             logger.warning("Ingestion content failure for file: %s, Error: %s", file.filename, exc)
             raise HTTPException(
                 status_code=422,
                 detail=str(exc),
             )
         except Exception as exc:
-            METRICS.ingestion_requests_total.labels(
-                source_type=source_type, status="failed"
-            ).inc()
+            METRICS.ingestion_requests_total.labels(source_type=source_type, status="failed").inc()
             logger.exception("Ingestion failed for file: %s", file.filename)
             raise HTTPException(
                 status_code=500,
@@ -412,9 +406,7 @@ def ingest_data(
             chunks = ingest_source(url, user_id=user_id)
 
             METRICS.ingestion_chunks_total.labels(source_type="url").inc(chunks)
-            METRICS.ingestion_requests_total.labels(
-                source_type="url", status="success"
-            ).inc()
+            METRICS.ingestion_requests_total.labels(source_type="url", status="success").inc()
 
             return {
                 "status": "success",
@@ -424,18 +416,14 @@ def ingest_data(
                 "source_type": "url",
             }
         except ValueError as exc:
-            METRICS.ingestion_requests_total.labels(
-                source_type="url", status="failed"
-            ).inc()
+            METRICS.ingestion_requests_total.labels(source_type="url", status="failed").inc()
             logger.warning("Ingestion content failure for URL: %s, Error: %s", url, exc)
             raise HTTPException(
                 status_code=422,
                 detail=str(exc),
             )
         except Exception as exc:
-            METRICS.ingestion_requests_total.labels(
-                source_type="url", status="failed"
-            ).inc()
+            METRICS.ingestion_requests_total.labels(source_type="url", status="failed").inc()
             logger.exception("Ingestion failed for URL: %s", url)
             raise HTTPException(
                 status_code=500,

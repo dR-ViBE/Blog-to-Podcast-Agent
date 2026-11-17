@@ -46,7 +46,6 @@ except ImportError:
 
 from api.routes import router
 
-
 # ---------------------------------------------------------------------------
 # LOGGING CONFIGURATION
 #
@@ -242,17 +241,21 @@ app.include_router(router, prefix="")
 # and reads from the on-disk snapshot files (persistence across restarts).
 _instrumentator = Instrumentator(
     should_group_status_codes=True,  # Group 2xx/4xx/5xx instead of per-code
-    should_ignore_untemplated=True,   # Ignore unknown routes (reduces cardinality)
-    should_respect_env_var=True,      # Disable via ENABLE_METRICS=false if needed
+    should_ignore_untemplated=True,  # Ignore unknown routes (reduces cardinality)
+    should_respect_env_var=True,  # Disable via ENABLE_METRICS=false if needed
     env_var_name="ENABLE_METRICS",
     excluded_handlers=["/metrics", "/health"],  # Don't instrument the metrics endpoint itself
 ).instrument(app)
 
 if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
     # Multiprocess mode: expose with a registry that reads from disk snapshots
-    from prometheus_client import multiprocess, CollectorRegistry
     from fastapi.responses import Response
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import (
+        CONTENT_TYPE_LATEST,
+        CollectorRegistry,
+        generate_latest,
+        multiprocess,
+    )
 
     @app.get("/metrics", tags=["Observability"], include_in_schema=False)
     def metrics_endpoint():
@@ -261,6 +264,7 @@ if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
         multiprocess.MultiProcessCollector(registry)
         data = generate_latest(registry)
         return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+
 else:
     # Single-process mode: use the standard in-memory registry
     _instrumentator.expose(app, endpoint="/metrics", tags=["Observability"])

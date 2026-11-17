@@ -28,7 +28,6 @@ from graph.state import GraphState
 from graph.utils.node_metrics import NodeTimer
 
 
-
 def _format_outline_for_prompt(outline: dict) -> str:
     """
     Converts the Planner's outline dict into a human-readable string
@@ -138,7 +137,6 @@ def generate_podcast_script(state: GraphState, config: RunnableConfig = None) ->
     # Phase 2 (#10): NodeTimer records generate_script latency to Prometheus.
     with NodeTimer("generate_script"):
         script = script_generation_chain.invoke(generation_input, config=node_config)
-
 
     return {
         "script": script,

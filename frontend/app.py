@@ -15,7 +15,13 @@ import os
 import streamlit as st
 
 # Import our API helper functions from utils.py
-from utils import check_api_health, fetch_audio_bytes, make_podcast_request, make_ingest_request, fetch_analytics
+from utils import (
+    check_api_health,
+    fetch_analytics,
+    fetch_audio_bytes,
+    make_ingest_request,
+    make_podcast_request,
+)
 
 # ---------------------------------------------------------------------------
 # ENVIRONMENT CONFIGURATION
@@ -249,9 +255,14 @@ def render_sidebar() -> tuple[str, int]:
         # When running inside Docker, api_base_url is the internal service name
         # (e.g. http://api:8000) which doesn't resolve in the user's browser.
         # We replace known Docker service names with localhost so the link works.
-        _browser_api_url = api_base_url.rstrip('/')
+        _browser_api_url = api_base_url.rstrip("/")
         import re as _re
-        _browser_api_url = _re.sub(r'http://api(:\d+)?', lambda m: f'http://localhost{m.group(1) or ":8000"}', _browser_api_url)
+
+        _browser_api_url = _re.sub(
+            r"http://api(:\d+)?",
+            lambda m: f"http://localhost{m.group(1) or ':8000'}",
+            _browser_api_url,
+        )
         st.link_button(
             "📚 View Chroma Chunks",
             f"{_browser_api_url}/chunks-view",
@@ -469,7 +480,11 @@ def render_dashboard(api_base_url: str):
                     return float(s.get("value", 0.0))
             return 0.0
         # If no filters, return the sum of all sample values (excluding metadata samples like _created)
-        return sum(float(s.get("value", 0.0)) for s in samples if not s.get("name", "").endswith("_created"))
+        return sum(
+            float(s.get("value", 0.0))
+            for s in samples
+            if not s.get("name", "").endswith("_created")
+        )
 
     # ── 1. AGGREGATE KEY METRICS ───────────────────────────────────────────────
     # Requests
@@ -488,8 +503,12 @@ def render_dashboard(api_base_url: str):
     total_cost_usd = get_val("podcast_llm_cost_usd", {"model": "openai/gpt-oss-20b"})
 
     # Tokens
-    prompt_tokens = int(get_val("podcast_tokens_used", {"model": "openai/gpt-oss-20b", "token_type": "prompt"}))
-    comp_tokens = int(get_val("podcast_tokens_used", {"model": "openai/gpt-oss-20b", "token_type": "completion"}))
+    prompt_tokens = int(
+        get_val("podcast_tokens_used", {"model": "openai/gpt-oss-20b", "token_type": "prompt"})
+    )
+    comp_tokens = int(
+        get_val("podcast_tokens_used", {"model": "openai/gpt-oss-20b", "token_type": "completion"})
+    )
     total_tokens = prompt_tokens + comp_tokens
 
     # Quality attempts
@@ -500,8 +519,8 @@ def render_dashboard(api_base_url: str):
 
     # Security
     injections_blocked = int(
-        get_val("podcast_injection_attempts", {"reason": "pattern_match"}) +
-        get_val("podcast_injection_attempts", {"reason": "semantic"})
+        get_val("podcast_injection_attempts", {"reason": "pattern_match"})
+        + get_val("podcast_injection_attempts", {"reason": "semantic"})
     )
     pii_detections = int(get_val("podcast_pii_detections"))
     pii_leaks_prevented = int(get_val("podcast_pii_output_detections"))
@@ -555,15 +574,21 @@ def render_dashboard(api_base_url: str):
 
     with left_col:
         st.markdown("### 🎨 Content Quality & Pacing")
-        
+
         # Quality score evaluation
         st.write("**First-Attempt Acceptance Rate**")
-        st.caption("Percentage of scripts that pass the Senior Editor on the first try without revisions.")
+        st.caption(
+            "Percentage of scripts that pass the Senior Editor on the first try without revisions."
+        )
         st.progress(first_try_rate / 100.0)
-        
-        quality_rating = "🟢 GOOD" if first_try_rate >= 70 else ("🟡 FAIR" if first_try_rate >= 40 else "🔴 POOR")
+
+        quality_rating = (
+            "🟢 GOOD"
+            if first_try_rate >= 70
+            else ("🟡 FAIR" if first_try_rate >= 40 else "🔴 POOR")
+        )
         st.write(f"Current Rating: **{quality_rating}** ({first_try_rate:.1f}%)")
-        
+
         st.markdown("""
         **Pacing Value Analysis:**
         * **First-try rate > 70%:** Planner and Writer are highly aligned. Generates scripts in under 30 seconds.
@@ -571,12 +596,14 @@ def render_dashboard(api_base_url: str):
         """)
 
         st.markdown("**Knowledge Base Composition**")
-        st.caption("Distribution of chunks stored in ChromaDB vector database by document source type:")
-        
+        st.caption(
+            "Distribution of chunks stored in ChromaDB vector database by document source type:"
+        )
+
         kb_data = {
             "PDF Files": ingested_pdf,
             "Web URLs crawled": ingested_url,
-            "Plain Text / Markdown": ingested_txt
+            "Plain Text / Markdown": ingested_txt,
         }
         for kb_type, count in kb_data.items():
             st.write(f"- **{kb_type}**: {int(count)} chunks")
@@ -584,7 +611,7 @@ def render_dashboard(api_base_url: str):
 
     with right_col:
         st.markdown("### 🛡️ Guardrails & Safety Auditing")
-        
+
         # Status indicators
         sec_col1, sec_col2 = st.columns(2)
         with sec_col1:
@@ -620,7 +647,7 @@ def render_dashboard(api_base_url: str):
     st.markdown("---")
     st.markdown("### 🔍 Agent Tool Selection")
     st.caption("Tracks how the Retriever Agent selects tools based on the Planner's outline needs:")
-    
+
     tool_col1, tool_col2 = st.columns(2)
     with tool_col1:
         st.markdown(
@@ -659,12 +686,12 @@ def render_dashboard(api_base_url: str):
     #   podcast_node_duration_seconds_count{node_name="..."} → number of observations
     # Mean = sum / count  (shown in seconds if < 60, otherwise in minutes)
     NODE_NAMES = [
-        ("plan_episode",        "🗂️  Plan Episode",       "#667eea"),
-        ("retrieve",            "🔍 Retrieve Chunks",     "#764ba2"),
-        ("generate_script",     "✍️  Generate Script",    "#f093fb"),
-        ("grade_script",        "🧑‍⚖️ Grade Script",      "#4facfe"),
-        ("suggest_improvements","💡 Suggest Improvements","#43e97b"),
-        ("generate_audio",      "🔊 Generate Audio",      "#fa709a"),
+        ("plan_episode", "🗂️  Plan Episode", "#667eea"),
+        ("retrieve", "🔍 Retrieve Chunks", "#764ba2"),
+        ("generate_script", "✍️  Generate Script", "#f093fb"),
+        ("grade_script", "🧑‍⚖️ Grade Script", "#4facfe"),
+        ("suggest_improvements", "💡 Suggest Improvements", "#43e97b"),
+        ("generate_audio", "🔊 Generate Audio", "#fa709a"),
     ]
 
     def get_node_stat(node_name: str, stat: str) -> float:
@@ -688,12 +715,11 @@ def render_dashboard(api_base_url: str):
                 return float(s.get("value", 0.0))
         return 0.0
 
-
     node_rows = []
     for node_id, node_label, node_color in NODE_NAMES:
         total_sec = get_node_stat(node_id, "sum")
-        count     = get_node_stat(node_id, "count")
-        mean_sec  = (total_sec / count) if count > 0 else 0.0
+        count = get_node_stat(node_id, "count")
+        mean_sec = (total_sec / count) if count > 0 else 0.0
         node_rows.append((node_id, node_label, node_color, mean_sec, int(count)))
 
     # Find max mean for normalised progress bars
@@ -726,7 +752,7 @@ def render_dashboard(api_base_url: str):
                             <div class="metric-label">{node_label}</div>
                             <div class="metric-value" style="font-size: 1.6rem;">{display_time}</div>
                             <div style="font-size: 0.75rem; color:#888; margin-top: 0.3rem;">
-                                avg · {count} run{'s' if count != 1 else ''}
+                                avg · {count} run{"s" if count != 1 else ""}
                             </div>
                         </div>
                         """,
@@ -797,36 +823,36 @@ def main():
                     "Upload a PDF or TXT document",
                     type=["pdf", "txt", "md"],
                     key="doc_uploader",
-                    label_visibility="collapsed"
+                    label_visibility="collapsed",
                 )
 
                 if st.button("🚀 Ingest Document", key="ingest_doc_btn", use_container_width=True):
                     if uploaded_file is not None:
                         with st.spinner("Ingesting and embedding document..."):
-                             file_bytes = uploaded_file.read()
-                             res = make_ingest_request(
-                                 api_base_url,
-                                 file_data=(uploaded_file.name, file_bytes),
-                                 user_id=st.session_state["user_id"]
-                             )
+                            file_bytes = uploaded_file.read()
+                            res = make_ingest_request(
+                                api_base_url,
+                                file_data=(uploaded_file.name, file_bytes),
+                                user_id=st.session_state["user_id"],
+                            )
                         if res["success"]:
-                             st.session_state["ingested_source"] = res["data"].get("source")
-                             st.success(
-                                 f"✅ Successfully ingested {res['data'].get('chunks')} chunks "
-                                 f"from PDF: {uploaded_file.name} for User: {st.session_state['user_id']}!\n\n"
-                                 f"Source path set: `{res['data'].get('source')}`"
-                             )
+                            st.session_state["ingested_source"] = res["data"].get("source")
+                            st.success(
+                                f"✅ Successfully ingested {res['data'].get('chunks')} chunks "
+                                f"from PDF: {uploaded_file.name} for User: {st.session_state['user_id']}!\n\n"
+                                f"Source path set: `{res['data'].get('source')}`"
+                            )
                         else:
-                             st.error(f"❌ Ingestion failed: {res['error']}")
+                            st.error(f"❌ Ingestion failed: {res['error']}")
                     else:
-                         st.warning("⚠️ Please select a file to upload first.")
+                        st.warning("⚠️ Please select a file to upload first.")
 
             with tab2:
                 url_to_ingest = st.text_input(
                     "Enter URL to crawl",
                     placeholder="https://example.com/blog-post",
                     key="url_ingest_input",
-                    label_visibility="collapsed"
+                    label_visibility="collapsed",
                 )
 
                 if st.button("🚀 Ingest URL", key="ingest_url_btn", use_container_width=True):
@@ -835,7 +861,7 @@ def main():
                             res = make_ingest_request(
                                 api_base_url,
                                 url_str=url_to_ingest,
-                                user_id=st.session_state["user_id"]
+                                user_id=st.session_state["user_id"],
                             )
                         if res["success"]:
                             st.session_state["ingested_source"] = res["data"].get("source")
@@ -870,10 +896,12 @@ def main():
             "Only search chunks from the specific source URL or file path provided. "
             "Leave blank to search all ingested sources."
         )
-        
+
         source_filter_val = st.text_input(
             label="Source Filter",
-            value=st.session_state["ingested_source"] if st.session_state["ingested_source"] else "",
+            value=(
+                st.session_state["ingested_source"] if st.session_state["ingested_source"] else ""
+            ),
             placeholder="e.g. outputs/uploads/my_resume.pdf or https://lilianweng.github.io",
             label_visibility="collapsed",
             key="source_filter_input",
@@ -923,22 +951,32 @@ def main():
             st.warning(
                 f"🔍 **Internet Crawling Required**\n\n"
                 f"The uploaded documents for profile `{st.session_state['user_id']}` do not contain "
-                f"information regarding your query: *\"{st.session_state['pending_query']}\"*."
+                f'information regarding your query: *"{st.session_state["pending_query"]}"*.'
             )
             st.write(
                 "Do you approve the system to crawl the internet to retrieve up-to-date facts "
                 "and generate the podcast?"
             )
-            
+
             col_ap1, col_ap2, _ = st.columns([2, 2, 8])
             with col_ap1:
-                if st.button("👍 Yes, Approve Web Crawl", type="primary", key="approve_crawl_btn", use_container_width=True):
+                if st.button(
+                    "👍 Yes, Approve Web Crawl",
+                    type="primary",
+                    key="approve_crawl_btn",
+                    use_container_width=True,
+                ):
                     st.session_state["web_search_approved"] = True
                     st.session_state["show_approval_prompt"] = False
                     st.session_state["is_loading"] = True
                     st.rerun()
             with col_ap2:
-                if st.button("👎 No, Cancel Search", type="secondary", key="cancel_crawl_btn", use_container_width=True):
+                if st.button(
+                    "👎 No, Cancel Search",
+                    type="secondary",
+                    key="cancel_crawl_btn",
+                    use_container_width=True,
+                ):
                     reset_results()
                     st.rerun()
 
@@ -946,12 +984,12 @@ def main():
             with st.status("🚀 Podcast pipeline running...", expanded=True) as status_box:
                 st.write("📡 Connecting to FastAPI backend...")
                 st.write(f"🔑 Active profile isolation: **{st.session_state['user_id']}**")
-                
+
                 if st.session_state["web_search_approved"]:
                     st.write("🌐 Web crawling: **APPROVED** (fallback enabled)")
                 else:
                     st.write("📚 Searching local vector store only...")
-                
+
                 st.write("✍️ Generating podcast script with Groq (LLaMA 3.1)...")
                 st.write("🧑‍⚖️ Grading script quality...")
                 st.write("💡 Iterating with improvement suggestions if needed...")
@@ -976,15 +1014,22 @@ def main():
                             f"⚠️ **No matching content found**\n\n{data.get('message', 'No relevant content was found in your uploaded documents.')}"
                         )
                         st.session_state["is_loading"] = False
-                        status_box.update(label="⚠️ No content found in your documents.", state="error")
+                        status_box.update(
+                            label="⚠️ No content found in your documents.", state="error"
+                        )
                     elif data.get("status") == "requires_approval":
                         st.session_state["show_approval_prompt"] = True
                         st.session_state["is_loading"] = False
-                        status_box.update(label="⚠️ Editor needs more context. Approval needed for web search.", state="error")
+                        status_box.update(
+                            label="⚠️ Editor needs more context. Approval needed for web search.",
+                            state="error",
+                        )
                     else:
                         st.session_state["result"] = data
                         st.session_state["is_loading"] = False
-                        status_box.update(label="✅ Podcast generated successfully!", state="complete")
+                        status_box.update(
+                            label="✅ Podcast generated successfully!", state="complete"
+                        )
                 else:
                     st.session_state["error_message"] = api_result["error"]
                     st.session_state["is_loading"] = False
@@ -998,16 +1043,14 @@ def main():
             st.error(st.session_state["error_message"])
 
             with st.expander("🛠️ Troubleshooting Tips"):
-                st.markdown(
-                    """
+                st.markdown("""
                     **API not reachable?**
                     - Make sure the FastAPI server is running:
                       ```
                       poetry run uvicorn api.main:app --reload
                       ```
                     - Check the API Base URL in the sidebar matches the server address.
-                    """
-                )
+                    """)
 
         # ── DISPLAY RESULTS (if any) ───────────────────────────────────────────
         if st.session_state["result"]:
@@ -1043,4 +1086,3 @@ def main():
 # Streamlit runs the entire script on every interaction, so we call main()
 # directly at the bottom (no `if __name__ == "__main__"` guard needed).
 main()
-

@@ -20,7 +20,7 @@ from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from pydantic import BaseModel, Field
 
-from graph.prompts.loader import load_prompt, get_prompt_version
+from graph.prompts.loader import get_prompt_version, load_prompt
 
 # ─── LLM Configuration (Two-Tier Fallback) ──────────────────────────────────
 # Tier 1 (Primary)  : Groq llama-3.1-8b-instant — fast, cheap.
@@ -86,9 +86,11 @@ structured_llm_grader = llm.with_structured_output(GradeScript)
 _GRADER_VERSION = get_prompt_version("grader")
 _system = load_prompt("grader", _GRADER_VERSION)
 
-grader_prompt = ChatPromptTemplate.from_messages([
-    ("system", _system),
-    ("human", "Generated Script:\n\n{script}"),
-])
+grader_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", _system),
+        ("human", "Generated Script:\n\n{script}"),
+    ]
+)
 
 script_grader: RunnableSequence = grader_prompt | structured_llm_grader

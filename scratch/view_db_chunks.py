@@ -4,7 +4,7 @@ from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 
 # Set system console encoding to utf-8 to prevent cp1252 errors on Windows
-sys.stdout.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding="utf-8")
 
 CHROMA_COLLECTION = "blog_podcast_agent"
 CHROMA_DIR = "./.chroma"
@@ -32,5 +32,5 @@ for i in range(min(3, len(ids))):
     print(f"  ID: {ids[i]}")
     print(f"  Source: {metadatas[i].get('source', 'Unknown')}")
     print(f"  Page: {metadatas[i].get('page', 'Unknown')}")
-    content_preview = documents[i][:300].replace('\n', ' ')
+    content_preview = documents[i][:300].replace("\n", " ")
     print(f"  Content Preview: {content_preview}...")

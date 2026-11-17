@@ -84,6 +84,7 @@ def _build_chroma_filter(
 
 from langchain_core.runnables import RunnableConfig
 
+
 @tool
 def search_vectorstore(
     query: str,

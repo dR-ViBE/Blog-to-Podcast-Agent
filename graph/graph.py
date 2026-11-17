@@ -36,7 +36,6 @@ from langgraph.graph import END, StateGraph
 
 from graph.checkpointer import get_checkpointer
 from graph.conditionals import decide_next_step
-
 from graph.consts import (
     GENERATE_AUDIO,
     GENERATE_SCRIPT,
@@ -66,12 +65,12 @@ workflow = StateGraph(GraphState)
 # Each node is a Python function registered under a string name.
 # The string name is used in edge definitions below.
 
-workflow.add_node(RETRIEVE, retrieve_blog_chunks)         # Retriever Agent (entry point)
-workflow.add_node(PLAN_EPISODE, plan_episode)             # Planner Agent (runs after retrieve)
+workflow.add_node(RETRIEVE, retrieve_blog_chunks)  # Retriever Agent (entry point)
+workflow.add_node(PLAN_EPISODE, plan_episode)  # Planner Agent (runs after retrieve)
 workflow.add_node(GENERATE_SCRIPT, generate_podcast_script)  # Writer Agent
-workflow.add_node(GRADE_SCRIPT, grade_script)            # Editor Agent (grading)
+workflow.add_node(GRADE_SCRIPT, grade_script)  # Editor Agent (grading)
 workflow.add_node(SUGGEST_IMPROVEMENTS, suggest_imporvements)  # Editor Agent (feedback)
-workflow.add_node(GENERATE_AUDIO, generate_audio)        # Audio Agent
+workflow.add_node(GENERATE_AUDIO, generate_audio)  # Audio Agent
 
 
 # ─── Define Edges (execution order) ─────────────────────────────────────────
@@ -125,10 +124,10 @@ workflow.add_conditional_edges(
     RETRIEVE,
     route_after_retrieval,
     {
-        PLAN_EPISODE: PLAN_EPISODE,          # Initial pass, docs found → plan from them
-        GENERATE_SCRIPT: GENERATE_SCRIPT,    # Supplemental pass → skip re-planning
-        "no_content": END,                   # Initial pass, no docs → fail fast
-        END: END,                            # Supplemental pass, web approval needed
+        PLAN_EPISODE: PLAN_EPISODE,  # Initial pass, docs found → plan from them
+        GENERATE_SCRIPT: GENERATE_SCRIPT,  # Supplemental pass → skip re-planning
+        "no_content": END,  # Initial pass, no docs → fail fast
+        END: END,  # Supplemental pass, web approval needed
     },
 )
 
@@ -172,4 +171,3 @@ workflow.add_edge(GENERATE_AUDIO, END)
 # thread_id in configurable), the graph skips already-completed nodes and
 # resumes from the last successful checkpoint.
 app = workflow.compile(checkpointer=get_checkpointer())
-

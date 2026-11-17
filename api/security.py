@@ -26,8 +26,8 @@ import os
 import re
 from typing import List, Optional, Tuple
 
-from fastapi import HTTPException
 import groq
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +62,17 @@ _INJECTION_PATTERNS: List[re.Pattern] = [
     re.compile(r"\bSYSTEM:\s", re.IGNORECASE),
     re.compile(r"\bINSTRUCTION:\s", re.IGNORECASE),
     # Jailbreak persona injection
-    re.compile(r"\bact\s+as\b.{0,30}\b(DAN|jailbreak|unrestricted|unfiltered|evil)\b", re.IGNORECASE),
+    re.compile(
+        r"\bact\s+as\b.{0,30}\b(DAN|jailbreak|unrestricted|unfiltered|evil)\b", re.IGNORECASE
+    ),
     re.compile(r"\bpretend\s+(you\s+are|to\s+be)\b", re.IGNORECASE),
     re.compile(r"\byou\s+are\s+now\s+(a|an|the)\b", re.IGNORECASE),
     # System prompt extraction
     re.compile(r"repeat\s+(your|the)\s+(system\s+)?(prompt|instructions|rules)", re.IGNORECASE),
-    re.compile(r"(print|output|show|display|reveal|leak)\s+(your|the)\s+(system\s+)?(prompt|instructions)", re.IGNORECASE),
+    re.compile(
+        r"(print|output|show|display|reveal|leak)\s+(your|the)\s+(system\s+)?(prompt|instructions)",
+        re.IGNORECASE,
+    ),
     re.compile(r"what\s+(are|is)\s+your\s+(system\s+)?(prompt|instructions)", re.IGNORECASE),
     # Developer/debug mode tricks
     re.compile(r"developer\s+mode", re.IGNORECASE),
@@ -95,7 +100,9 @@ class PromptInjectionGuard:
         api_key = os.getenv("GROQ_API_KEY")
         self._client = groq.Groq(api_key=api_key) if api_key else None
         if not self._client:
-            logger.warning("GROQ_API_KEY not set. Semantic prompt injection guard DISABLED (regex-only active).")
+            logger.warning(
+                "GROQ_API_KEY not set. Semantic prompt injection guard DISABLED (regex-only active)."
+            )
 
     def check(self, query: str) -> None:
         """
@@ -177,7 +184,10 @@ class PromptInjectionGuard:
                 # Re-raise HTTPExceptions raised by our logic
                 raise
             except Exception as e:
-                logger.warning("Semantic prompt injection guard check failed: %s. Falling back to regex-only results.", e)
+                logger.warning(
+                    "Semantic prompt injection guard check failed: %s. Falling back to regex-only results.",
+                    e,
+                )
 
         logger.debug("Query passed injection check | length=%d", len(query))
 
@@ -203,7 +213,7 @@ _PII_ENTITIES = [
     "PHONE_NUMBER",
     "LOCATION",
     "DATE_TIME",
-    "NRP",           # Nationality, religion, political group
+    "NRP",  # Nationality, religion, political group
     "CREDIT_CARD",
     "IBAN_CODE",
     "IP_ADDRESS",

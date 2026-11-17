@@ -29,8 +29,7 @@ def main():
         meta_text = json.dumps(meta or {}, ensure_ascii=False, indent=2)
         safe_doc = escape(doc or "")
         safe_meta = escape(meta_text)
-        cards.append(
-            f"""
+        cards.append(f"""
             <section class=\"chunk-card\">
               <div class=\"chunk-header\">
                 <h3>Chunk {idx}</h3>
@@ -43,8 +42,7 @@ def main():
               </div>
               <div class=\"content\">{safe_doc}</div>
             </section>
-            """
-        )
+            """)
 
     html_doc = f"""<!DOCTYPE html>
 <html lang=\"en\">
