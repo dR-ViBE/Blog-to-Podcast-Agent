@@ -133,3 +133,21 @@ outputs/chroma_chunks_view.html
 
 # Test results
 test_results/
+
+# ── Runtime-generated data (machine-specific, not for version control) ─────────
+# Prometheus multiprocess on-disk metric snapshots (process-ID-stamped binary files)
+outputs/prometheus_data/
+
+# LangGraph SQLite checkpoint database (graph run state, rebuilt at runtime)
+outputs/checkpoints/
+
+# Local API/startup log files
+*.log
+api_live.log
+api_stderr.log
+api_stdout.log
+startup.log
+
+# Local helper scripts (dev convenience, not part of the deployable app)
+start.ps1
+stop.ps1

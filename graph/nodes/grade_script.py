@@ -19,6 +19,8 @@ from langchain_core.runnables import RunnableConfig
 
 from graph.chains.script_grader_chain import script_grader
 from graph.state import GraphState
+from graph.utils.node_metrics import NodeTimer
+
 
 
 def grade_script(state: GraphState, config: RunnableConfig = None) -> Dict:
@@ -55,7 +57,10 @@ def grade_script(state: GraphState, config: RunnableConfig = None) -> Dict:
         },
     )
 
-    result = script_grader.invoke({"script": script}, config=node_config)
+    # Phase 2 (#10): NodeTimer records grade_script latency to Prometheus.
+    with NodeTimer("grade_script"):
+        result = script_grader.invoke({"script": script}, config=node_config)
+
 
     return {
         # Primary routing field — decide_next_step reads this

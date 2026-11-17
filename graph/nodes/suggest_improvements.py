@@ -12,6 +12,8 @@ from langchain_core.runnables import RunnableConfig
 
 from graph.chains.improvements_chain import suggest_improvements_chain
 from graph.state import GraphState
+from graph.utils.node_metrics import NodeTimer
+
 
 
 def suggest_imporvements(state: GraphState, config: RunnableConfig = None) -> Dict:
@@ -56,9 +58,12 @@ def suggest_imporvements(state: GraphState, config: RunnableConfig = None) -> Di
     )
 
     # Invoke the improvements chain, forwarding the enriched config
-    suggestions = suggest_improvements_chain.invoke(
-        {"script": script, "script_evaluation": script_evaluation},
-        config=node_config,
-    )
+    # Phase 2 (#10): NodeTimer records suggest_improvements latency to Prometheus.
+    with NodeTimer("suggest_improvements"):
+        suggestions = suggest_improvements_chain.invoke(
+            {"script": script, "script_evaluation": script_evaluation},
+            config=node_config,
+        )
 
     return {"improvement_suggestions": suggestions}
+

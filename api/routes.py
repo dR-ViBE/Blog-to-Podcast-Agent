@@ -78,11 +78,27 @@ def get_analytics():
     
     This allows non-technical users to view metrics as a beautiful dashboard
     in our Streamlit frontend, without requiring a separate Grafana/Prometheus setup.
+
+    Phase 2 (#2): In multiprocess mode (PROMETHEUS_MULTIPROC_DIR is set), we use
+    MultiProcessCollector so that metrics recorded in worker processes (read from
+    on-disk .db snapshots) are included. Without this, the analytics endpoint would
+    only see in-process metrics and return empty histograms for node_duration etc.
     """
-    from prometheus_client import REGISTRY
+    import os
+    from prometheus_client import CollectorRegistry, REGISTRY
+
+    # Decide which registry to collect from
+    if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        # Multiprocess mode — read from on-disk .db snapshot files
+        from prometheus_client import multiprocess
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+    else:
+        # Single-process mode — use the default in-memory registry
+        registry = REGISTRY
 
     data = {}
-    for metric in REGISTRY.collect():
+    for metric in registry.collect():
         if metric.name.startswith("podcast_"):
             samples = []
             for sample in metric.samples:
@@ -97,6 +113,7 @@ def get_analytics():
                 "samples": samples
             }
     return data
+
 
 
 # ---------------------------------------------------------------------------
@@ -375,9 +392,9 @@ def ingest_data(
             METRICS.ingestion_requests_total.labels(
                 source_type=source_type, status="failed"
             ).inc()
-            logger.warning("Ingestion validation failed for file: %s, Error: %s", file.filename, exc)
+            logger.warning("Ingestion content failure for file: %s, Error: %s", file.filename, exc)
             raise HTTPException(
-                status_code=400,
+                status_code=422,
                 detail=str(exc),
             )
         except Exception as exc:
@@ -410,9 +427,9 @@ def ingest_data(
             METRICS.ingestion_requests_total.labels(
                 source_type="url", status="failed"
             ).inc()
-            logger.warning("Ingestion validation failed for URL: %s, Error: %s", url, exc)
+            logger.warning("Ingestion content failure for URL: %s, Error: %s", url, exc)
             raise HTTPException(
-                status_code=400,
+                status_code=422,
                 detail=str(exc),
             )
         except Exception as exc:

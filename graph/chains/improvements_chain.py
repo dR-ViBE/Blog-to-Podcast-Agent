@@ -11,11 +11,11 @@ from langchain_ollama import ChatOllama
 from graph.prompts.loader import load_prompt, get_prompt_version
 
 # ─── LLM Configuration (Two-Tier Fallback) ──────────────────────────────────
-# Tier 1 (Primary)  : Groq llama-3.1-8b-instant — fast, cheap.
-# Tier 2 (Fallback) : Groq llama-3.3-70b-versatile — more capable Groq model.
+# Tier 1 (Primary)  : Groq openai/gpt-oss-20b — fast, tool-calling capable, active.
+# Tier 2 (Fallback) : Groq openai/gpt-oss-120b — larger, more capable Groq model.
 # Tier 3 (Local)    : Ollama phi3 — free local fallback if Groq is unreachable.
-_primary_llm = ChatGroq(model="llama-3.1-8b-instant", max_tokens=2500)
-_groq_fallback = ChatGroq(model="llama-3.3-70b-versatile", max_tokens=2500)
+_primary_llm = ChatGroq(model="openai/gpt-oss-20b", max_tokens=2500)
+_groq_fallback = ChatGroq(model="openai/gpt-oss-120b", max_tokens=2500)
 _local_fallback = ChatOllama(model="phi3:latest")
 
 llm = _primary_llm.with_fallbacks(

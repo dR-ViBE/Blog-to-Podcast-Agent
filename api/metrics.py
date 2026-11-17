@@ -20,17 +20,78 @@
 #   - Gauge:     Current point-in-time value (can go up and down).
 #                Use for: queue depth, active connections, cache size.
 #
+# PHASE 2 (#2) — PERSISTENT METRICS:
+#   When PROMETHEUS_MULTIPROC_DIR is set in the environment, prometheus_client
+#   writes metric state snapshots to that directory on disk. On restart, the
+#   collector reads these files and restores the prior counter values.
+#   This means request counts, cost, and quality data survive server restarts.
+#
+#   The directory must be set BEFORE any prometheus_client objects are imported.
+#   main.py calls _ensure_prometheus_multiproc_dir() in its lifespan startup
+#   block, which sets os.environ BEFORE this module is first imported in any
+#   non-startup context. In practice, since FastAPI imports routes at startup
+#   before lifespan fires, we also set it here at module load time.
+#
+# PHASE 2 (#10) — PER-NODE METRICS:
+#   Two new metrics track individual graph node performance:
+#   - podcast_node_duration_seconds: latency per node
+#   - podcast_node_llm_cost_usd_total: cost attributed per node
+#
 # HOW TO USE:
 #   from api.metrics import METRICS
 #   METRICS.requests_total.labels(status="success").inc()
-#   METRICS.pipeline_duration.observe(elapsed_seconds)
+#   METRICS.pipeline_duration_seconds.observe(elapsed_seconds)
 
 import logging
+import os
 from dataclasses import dataclass
-
-from prometheus_client import Counter, Histogram, Gauge, REGISTRY
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# PHASE 2 (#2): ENSURE MULTIPROCESS DIR IS SET BEFORE REGISTRY INITIALISATION
+#
+# prometheus_client reads PROMETHEUS_MULTIPROC_DIR at import time. We must set
+# os.environ BEFORE importing Counter/Histogram/Gauge. If the variable is
+# already set (e.g. by Docker or the OS), we respect the existing value.
+# ---------------------------------------------------------------------------
+
+def _ensure_prometheus_multiproc_dir() -> bool:
+    """
+    Ensures PROMETHEUS_MULTIPROC_DIR is set and the directory exists.
+    Returns True if multiprocess mode is active, False otherwise.
+    """
+    # Check if already set (e.g. by Docker env or OS)
+    existing = os.environ.get("PROMETHEUS_MULTIPROC_DIR", "").strip()
+    if not existing:
+        # Try to read from .env-loaded value (dotenv already ran in main.py)
+        env_value = os.getenv("PROMETHEUS_MULTIPROC_DIR", "")
+        if env_value:
+            os.environ["PROMETHEUS_MULTIPROC_DIR"] = env_value
+            existing = env_value
+
+    if not existing:
+        logger.info(
+            "PROMETHEUS_MULTIPROC_DIR not set — metrics will be in-memory only "
+            "(reset on restart). Set this env var to enable persistence."
+        )
+        return False
+
+    # Create the directory if it doesn't exist
+    dir_path = Path(existing)
+    dir_path.mkdir(parents=True, exist_ok=True)
+    logger.info(
+        "Prometheus multiprocess mode ACTIVE | dir=%s | metrics will persist across restarts",
+        dir_path.resolve(),
+    )
+    return True
+
+
+_MULTIPROC_ACTIVE = _ensure_prometheus_multiproc_dir()
+
+# Now safe to import prometheus_client — it reads PROMETHEUS_MULTIPROC_DIR here
+from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, REGISTRY
 
 
 # ---------------------------------------------------------------------------
@@ -83,9 +144,8 @@ class PodcastMetrics:
     llm_cost_usd_total: Counter
     """
     Cumulative LLM cost in USD, labelled by model.
-    Labels: model = "llama-3.1-8b-instant" | "other"
+    Labels: model
     Use rate(podcast_llm_cost_usd_total[1h]) to see hourly spend.
-    Good: < $0.01 per run on Groq free tier (llama-3.1-8b is very cheap).
     """
 
     tokens_used_total: Counter
@@ -176,12 +236,30 @@ class PodcastMetrics:
     Alert if: sustained > 5 = requests backing up, server under stress.
     """
 
+    # ── Phase 2 (#10): Per-Node Metrics ───────────────────────────────────────
+
+    node_duration_seconds: Histogram
+    """
+    Latency of each individual graph node in seconds.
+    Labels: node_name = "plan_episode" | "retrieve" | "generate_script" |
+                        "grade_script" | "suggest_improvements" | "generate_audio"
+    Use to identify which node is the pipeline bottleneck.
+    """
+
+    node_llm_cost_usd_total: Counter
+    """
+    Estimated LLM cost attributed to each graph node.
+    Labels: node_name, model
+    Use to identify which node consumes the most tokens/cost.
+    """
+
 
 def _build_metrics() -> PodcastMetrics:
     """Creates and registers all Prometheus metrics. Called once at module load."""
 
     # Histogram bucket boundaries chosen to match expected latency distributions
-    DURATION_BUCKETS = [5.0, 15.0, 30.0, 60.0, 90.0, 120.0, 180.0, 300.0]
+    DURATION_BUCKETS = [1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 180.0, 300.0]
+    NODE_DURATION_BUCKETS = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0, 90.0]
     WORD_COUNT_BUCKETS = [100, 200, 350, 450, 550, 650, 750, 900, 1200]
     DOC_COUNT_BUCKETS = [1, 2, 4, 6, 8, 10, 15, 20]
 
@@ -268,6 +346,18 @@ def _build_metrics() -> PodcastMetrics:
             "podcast_active_pipeline_runs",
             "Currently executing podcast pipeline runs",
         ),
+        # Phase 2 (#10): Per-node metrics
+        node_duration_seconds=Histogram(
+            "podcast_node_duration_seconds",
+            "Latency of each individual graph node in seconds",
+            ["node_name"],
+            buckets=NODE_DURATION_BUCKETS,
+        ),
+        node_llm_cost_usd_total=Counter(
+            "podcast_node_llm_cost_usd_total",
+            "Estimated LLM cost attributed to each graph node",
+            ["node_name", "model"],
+        ),
     )
 
 
@@ -280,4 +370,7 @@ def _build_metrics() -> PodcastMetrics:
 #   METRICS.requests_total.labels(status="success").inc()
 
 METRICS = _build_metrics()
-logger.info("Prometheus metrics registry initialised with %d metrics.", 14)
+logger.info(
+    "Prometheus metrics registry initialised | multiprocess_mode=%s | total_metrics=16",
+    _MULTIPROC_ACTIVE,
+)

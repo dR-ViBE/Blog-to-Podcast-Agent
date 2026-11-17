@@ -16,6 +16,14 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+# Phase 2 (#2): Set PROMETHEUS_MULTIPROC_DIR BEFORE any prometheus_client import.
+# dotenv hasn't loaded yet at this point in module evaluation, so we read .env
+# manually to ensure the dir exists before the metrics module is imported.
+_prom_dir_raw = os.environ.get("PROMETHEUS_MULTIPROC_DIR", "outputs/prometheus_data")
+_prom_dir = Path(_prom_dir_raw)
+_prom_dir.mkdir(parents=True, exist_ok=True)
+os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(_prom_dir)
+
 from dotenv import load_dotenv
 
 # Load environment variables before any internal modules are imported
@@ -144,6 +152,22 @@ async def lifespan(app: FastAPI):
         logger.info("LangSmith tracing DISABLED. Set LANGCHAIN_TRACING_V2=true in .env to enable.")
     # ── End LangSmith startup check ─────────────────────────────────────────
 
+    # ── Phase 2 (#2): Confirm Prometheus persistence directory ───────────────
+    prom_dir = Path(os.environ.get("PROMETHEUS_MULTIPROC_DIR", "outputs/prometheus_data"))
+    prom_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(
+        "Prometheus persistence ACTIVE | dir=%s | metrics survive restarts",
+        prom_dir.resolve(),
+    )
+
+    # ── Phase 2 (#6): Confirm checkpoint directory ───────────────────────────
+    checkpoint_path = os.environ.get("CHECKPOINT_DB_PATH", "outputs/checkpoints/graph_state.db")
+    Path(checkpoint_path).parent.mkdir(parents=True, exist_ok=True)
+    logger.info(
+        "LangGraph checkpoint ACTIVE | db=%s | graph runs resume after crashes",
+        checkpoint_path,
+    )
+
     logger.info("Blog-to-Podcast API is ready to accept requests.")
 
     yield  # Application runs here
@@ -213,13 +237,33 @@ app.include_router(router, prefix="")
 #   curl http://localhost:8000/metrics
 #   → Returns all metrics in Prometheus text exposition format
 # ---------------------------------------------------------------------------
-Instrumentator(
+# Phase 2 (#2): Use multiprocess-aware collector when PROMETHEUS_MULTIPROC_DIR is set.
+# This ensures the /metrics endpoint aggregates metrics from all worker processes
+# and reads from the on-disk snapshot files (persistence across restarts).
+_instrumentator = Instrumentator(
     should_group_status_codes=True,  # Group 2xx/4xx/5xx instead of per-code
     should_ignore_untemplated=True,   # Ignore unknown routes (reduces cardinality)
     should_respect_env_var=True,      # Disable via ENABLE_METRICS=false if needed
     env_var_name="ENABLE_METRICS",
     excluded_handlers=["/metrics", "/health"],  # Don't instrument the metrics endpoint itself
-).instrument(app).expose(app, endpoint="/metrics", tags=["Observability"])
+).instrument(app)
+
+if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+    # Multiprocess mode: expose with a registry that reads from disk snapshots
+    from prometheus_client import multiprocess, CollectorRegistry
+    from fastapi.responses import Response
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+    @app.get("/metrics", tags=["Observability"], include_in_schema=False)
+    def metrics_endpoint():
+        """Prometheus metrics endpoint — multiprocess-aware, persists across restarts."""
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        data = generate_latest(registry)
+        return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+else:
+    # Single-process mode: use the standard in-memory registry
+    _instrumentator.expose(app, endpoint="/metrics", tags=["Observability"])
 
 
 # ---------------------------------------------------------------------------

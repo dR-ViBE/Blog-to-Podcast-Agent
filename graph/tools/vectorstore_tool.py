@@ -5,18 +5,19 @@ PURPOSE:
     LangChain @tool that lets the Retriever Agent search the local ChromaDB
     vector store. Supports compound metadata filtering (source URL + source type).
 
-METADATA FILTERING (Phase 1 enhancement):
+METADATA FILTERING:
     ChromaDB supports compound `where` filters using $and / $or operators.
-    We build a compound filter when both source_filter AND source_type_filter
-    are provided, allowing queries like:
-      "Only search PDF files from this specific domain"
+    Supported metadata operators: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte
+    NOTE: $contains is ONLY valid in where_document (full-text content search),
+          NOT in `where` (metadata field filters). Using $contains in `where`
+          raises: "Expected where operator to be one of gt, gte, lt, lte, ne, eq, in, nin"
 
-    Single filters work as before:
-      source_filter="https://lilianweng.github.io"  → filters by URL prefix
-      source_type_filter="pdf"                       → filters to PDF content only
+    Single filters:
+      source_filter="https://lilianweng.github.io"  -> exact URL match ($eq)
+      source_type_filter="pdf"                       -> exact type match ($eq)
 
     Combined filters use ChromaDB's $and operator:
-      {"$and": [{"source_type": {"$eq": "pdf"}}, {"source": {"$contains": "..."}}]}
+      {"$and": [{"source_type": {"$eq": "pdf"}}, {"source": {"$eq": "..."}}]}
 """
 
 import logging
@@ -63,7 +64,10 @@ def _build_chroma_filter(
         conditions.append({"user_id": {"$eq": user_id.strip()}})
 
     if source_filter and source_filter.strip():
-        conditions.append({"source": {"$contains": source_filter.strip()}})
+        # ChromaDB metadata `where` only supports: $eq, $ne, $in, $nin, $gt, $gte, $lt, $lte
+        # $contains is NOT supported in `where` — it only works in `where_document`.
+        # We use $eq for exact source match (source is stored as the full URL or file path).
+        conditions.append({"source": {"$eq": source_filter.strip()}})
 
     if source_type_filter and source_type_filter.strip():
         # source_type is an exact match field (e.g. "pdf", "url", "text")
@@ -74,7 +78,7 @@ def _build_chroma_filter(
     elif len(conditions) == 1:
         return conditions[0]
     else:
-        # Multiple conditions → compound AND filter
+        # Multiple conditions -> compound AND filter
         return {"$and": conditions}
 
 

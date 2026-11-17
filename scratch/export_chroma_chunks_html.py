@@ -7,7 +7,7 @@ import chromadb
 
 ROOT = Path(__file__).resolve().parents[1]
 CHROMA_DIR = ROOT / ".chroma"
-COLLECTION_NAME = "blog_podcast_agent"
+COLLECTION_NAME = "blog_podcast_agent_v2"
 OUTPUT_HTML = ROOT / "outputs" / "chroma_chunks_view.html"
 
 

@@ -21,6 +21,7 @@ from typing_extensions import TypedDict
 from langchain_core.documents import Document
 
 
+
 class GraphState(TypedDict):
     """
     The shared state for the Blog-to-Podcast LangGraph pipeline.
@@ -51,6 +52,10 @@ class GraphState(TypedDict):
         total_tokens_used:      Cumulative estimated token count (prompt + completion).
         pii_was_masked:         True if PII was detected and masked in the input query.
         pii_entities_found:     List of PII entity types detected in input (e.g. ["PERSON"]).
+        checkpoint_thread_id:   Unique thread ID for LangGraph checkpointing.
+                                Set in services.py before graph invocation.
+                                Allows graph runs to be resumed from the last
+                                successful node after a crash (Phase 2 #6).
     """
 
     url: str
@@ -79,3 +84,12 @@ class GraphState(TypedDict):
     # ── PII Tracking (Phase 1) ───────────────────────────────────────────────
     pii_was_masked: bool                    # True if query PII was masked before graph invocation
     pii_entities_found: List[str]           # Entity types masked (e.g. ["PERSON", "EMAIL_ADDRESS"])
+    # ── Checkpoint Tracking (Phase 2 #6) ────────────────────────────────────
+    checkpoint_thread_id: Optional[str]     # Unique key for LangGraph SQLite checkpoint (deterministic replay)
+    # ── Retrieval Failure Reason (Change 3: Relevance Gate) ──────────────────
+    retrieval_failure_reason: Optional[str]  # Set when initial retrieval yields no documents.
+                                             # Possible values:
+                                             #   "no_documents_ingested" – user has no content in DB at all
+                                             #   "no_matching_content"   – docs exist but none match query
+                                             # When set, route_after_retrieval routes to END immediately
+                                             # (fail-fast) instead of offering web search.

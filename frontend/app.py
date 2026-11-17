@@ -245,9 +245,16 @@ def render_sidebar() -> tuple[str, int]:
                     "❌ API is offline. Start it with:\n`poetry run uvicorn api.main:app --reload`"
                 )
 
+        # Build a browser-accessible URL for the chunks viewer.
+        # When running inside Docker, api_base_url is the internal service name
+        # (e.g. http://api:8000) which doesn't resolve in the user's browser.
+        # We replace known Docker service names with localhost so the link works.
+        _browser_api_url = api_base_url.rstrip('/')
+        import re as _re
+        _browser_api_url = _re.sub(r'http://api(:\d+)?', lambda m: f'http://localhost{m.group(1) or ":8000"}', _browser_api_url)
         st.link_button(
             "📚 View Chroma Chunks",
-            f"{api_base_url.rstrip('/')}/chunks-view",
+            f"{_browser_api_url}/chunks-view",
             use_container_width=True,
             help="Opens a beautiful HTML visualization listing all database text chunks, metadata, and files in a new tab.",
         )
@@ -476,12 +483,13 @@ def render_dashboard(api_base_url: str):
     # Active Runs
     active_runs = int(get_val("podcast_active_pipeline_runs"))
 
-    # Cost
-    total_cost_usd = get_val("podcast_llm_cost_usd", {"model": "llama-3.1-8b-instant"})
+    # Cost — updated model label from llama-3.1-8b-instant to openai/gpt-oss-20b
+    # (chains were updated during CI implementation; dashboard filter must match)
+    total_cost_usd = get_val("podcast_llm_cost_usd", {"model": "openai/gpt-oss-20b"})
 
     # Tokens
-    prompt_tokens = int(get_val("podcast_tokens_used", {"model": "llama-3.1-8b-instant", "token_type": "prompt"}))
-    comp_tokens = int(get_val("podcast_tokens_used", {"model": "llama-3.1-8b-instant", "token_type": "completion"}))
+    prompt_tokens = int(get_val("podcast_tokens_used", {"model": "openai/gpt-oss-20b", "token_type": "prompt"}))
+    comp_tokens = int(get_val("podcast_tokens_used", {"model": "openai/gpt-oss-20b", "token_type": "completion"}))
     total_tokens = prompt_tokens + comp_tokens
 
     # Quality attempts
@@ -636,6 +644,117 @@ def render_dashboard(api_base_url: str):
             """,
             unsafe_allow_html=True,
         )
+
+    # ── 5. PER-NODE LATENCY BREAKDOWN (Phase 2 #10) ───────────────────────────
+    st.markdown("---")
+    st.markdown("### ⏱️ Per-Node Pipeline Latency Breakdown")
+    st.caption(
+        "Average execution time for each individual LangGraph node across all completed runs. "
+        "Use this to identify bottlenecks — whichever node has the highest mean latency is "
+        "the one to optimise first."
+    )
+
+    # The node_duration histogram exposes three sample types per label bucket:
+    #   podcast_node_duration_seconds_sum{node_name="..."}   → total seconds across all runs
+    #   podcast_node_duration_seconds_count{node_name="..."} → number of observations
+    # Mean = sum / count  (shown in seconds if < 60, otherwise in minutes)
+    NODE_NAMES = [
+        ("plan_episode",        "🗂️  Plan Episode",       "#667eea"),
+        ("retrieve",            "🔍 Retrieve Chunks",     "#764ba2"),
+        ("generate_script",     "✍️  Generate Script",    "#f093fb"),
+        ("grade_script",        "🧑‍⚖️ Grade Script",      "#4facfe"),
+        ("suggest_improvements","💡 Suggest Improvements","#43e97b"),
+        ("generate_audio",      "🔊 Generate Audio",      "#fa709a"),
+    ]
+
+    def get_node_stat(node_name: str, stat: str) -> float:
+        """Returns _sum or _count for a node from the histogram.
+
+        The /analytics endpoint returns all histogram samples nested under the
+        single key 'podcast_node_duration_seconds'. Each sample has:
+          - 'name': 'podcast_node_duration_seconds_sum' | '_count' | '_bucket'
+          - 'labels': {'node_name': '...', ...}
+          - 'value': float
+        """
+        target_sample_name = f"podcast_node_duration_seconds_{stat}"
+        # All node_duration samples live under the parent histogram key
+        hist = metrics_data.get("podcast_node_duration_seconds", {})
+        samples = hist.get("samples", [])
+        for s in samples:
+            if (
+                s.get("name") == target_sample_name
+                and s.get("labels", {}).get("node_name") == node_name
+            ):
+                return float(s.get("value", 0.0))
+        return 0.0
+
+
+    node_rows = []
+    for node_id, node_label, node_color in NODE_NAMES:
+        total_sec = get_node_stat(node_id, "sum")
+        count     = get_node_stat(node_id, "count")
+        mean_sec  = (total_sec / count) if count > 0 else 0.0
+        node_rows.append((node_id, node_label, node_color, mean_sec, int(count)))
+
+    # Find max mean for normalised progress bars
+    max_mean = max((r[3] for r in node_rows), default=1.0) or 1.0
+
+    if all(r[4] == 0 for r in node_rows):
+        st.info(
+            "ℹ️ No per-node timing data yet. Run at least one podcast request to populate this section. "
+            "Metrics are recorded by the NodeTimer context manager inside each graph node."
+        )
+    else:
+        # Summary metric cards (2 per row)
+        for i in range(0, len(node_rows), 3):
+            cols = st.columns(3)
+            for j, col in enumerate(cols):
+                if i + j >= len(node_rows):
+                    break
+                node_id, node_label, node_color, mean_sec, count = node_rows[i + j]
+                with col:
+                    if mean_sec >= 60:
+                        display_time = f"{mean_sec / 60:.1f} min"
+                    elif mean_sec >= 1:
+                        display_time = f"{mean_sec:.1f}s"
+                    else:
+                        display_time = f"{mean_sec * 1000:.0f} ms"
+
+                    st.markdown(
+                        f"""
+                        <div class="result-card" style="border-left: 5px solid {node_color};">
+                            <div class="metric-label">{node_label}</div>
+                            <div class="metric-value" style="font-size: 1.6rem;">{display_time}</div>
+                            <div style="font-size: 0.75rem; color:#888; margin-top: 0.3rem;">
+                                avg · {count} run{'s' if count != 1 else ''}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+        # Relative latency bar chart (visual comparison)
+        st.markdown("**Relative Node Latency (normalised to slowest node)**")
+        for node_id, node_label, node_color, mean_sec, count in node_rows:
+            if count == 0:
+                continue
+            fraction = mean_sec / max_mean
+            if mean_sec >= 60:
+                label_time = f"{mean_sec / 60:.1f} min"
+            elif mean_sec >= 1:
+                label_time = f"{mean_sec:.1f}s"
+            else:
+                label_time = f"{mean_sec * 1000:.0f} ms"
+
+            bar_col, time_col = st.columns([5, 1])
+            with bar_col:
+                st.progress(fraction, text=node_label)
+            with time_col:
+                st.markdown(
+                    f"<div style='padding-top: 0.4rem; font-size: 0.85rem; color: {node_color};'>"
+                    f"<strong>{label_time}</strong></div>",
+                    unsafe_allow_html=True,
+                )
 
 
 def main():
@@ -850,10 +969,18 @@ def main():
 
                 if api_result["success"]:
                     data = api_result["data"]
-                    if data.get("status") == "requires_approval":
+                    if data.get("status") == "no_content":
+                        # Retrieval found nothing — fail fast with actionable message.
+                        # Do NOT show the web search approval dialog here.
+                        st.session_state["error_message"] = (
+                            f"⚠️ **No matching content found**\n\n{data.get('message', 'No relevant content was found in your uploaded documents.')}"
+                        )
+                        st.session_state["is_loading"] = False
+                        status_box.update(label="⚠️ No content found in your documents.", state="error")
+                    elif data.get("status") == "requires_approval":
                         st.session_state["show_approval_prompt"] = True
                         st.session_state["is_loading"] = False
-                        status_box.update(label="⚠️ Local context insufficient. Approval needed for web crawling.", state="error")
+                        status_box.update(label="⚠️ Editor needs more context. Approval needed for web search.", state="error")
                     else:
                         st.session_state["result"] = data
                         st.session_state["is_loading"] = False

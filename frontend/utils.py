@@ -158,6 +158,18 @@ def make_ingest_request(
         response.raise_for_status()
         return {"success": True, "data": response.json()}
 
+    except requests.exceptions.HTTPError as exc:
+        # Server replied with 4xx/5xx — extract FastAPI's "detail" field.
+        # This is where the actionable crawl-failure message lives for 422 errors.
+        try:
+            detail = exc.response.json().get("detail", str(exc))
+        except Exception:
+            detail = str(exc)
+        status_code = exc.response.status_code
+        if status_code == 422:
+            return {"success": False, "error": f"⚠️ Could not extract content (422):\n\n{detail}"}
+        return {"success": False, "error": f"🚫 Ingestion failed (HTTP {status_code}):\n\n{detail}"}
+
     except Exception as exc:
         return {"success": False, "error": f"Ingestion request failed: {exc}"}
 

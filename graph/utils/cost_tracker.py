@@ -21,11 +21,8 @@
 #   treats these as exact billing figures.
 #
 # PRICING:
-#   Groq pricing (as of July 2026, on-demand tier):
-#     llama-3.1-8b-instant:  $0.05 per million input tokens
-#                            $0.08 per million output tokens
-#
-#   These are stored as constants and can be updated without code changes.
+#   Groq pricing (active models as of Oct 2026 — exact figures TBD, using estimates).
+#   Update these values when Groq publishes official per-token pricing.
 #   We use per-million-token pricing because Groq publishes in that unit.
 
 import logging
@@ -40,17 +37,18 @@ logger = logging.getLogger(__name__)
 # Update these values when Groq changes pricing.
 
 GROQ_PRICING: dict = {
-    "llama-3.1-8b-instant": {
-        "input": 0.05,   # USD per million input tokens
-        "output": 0.08,  # USD per million output tokens
+    # Active models (Oct 2026)
+    "openai/gpt-oss-20b": {
+        "input": 0.10,   # USD per million input tokens (estimate until Groq publishes)
+        "output": 0.15,  # USD per million output tokens (estimate)
     },
-    "llama-3.3-70b-versatile": {
-        "input": 0.59,
-        "output": 0.79,
+    "openai/gpt-oss-120b": {
+        "input": 0.50,   # USD per million input tokens (estimate)
+        "output": 0.75,  # USD per million output tokens (estimate)
     },
-    "llama-3.1-70b-versatile": {
-        "input": 0.59,
-        "output": 0.79,
+    "qwen/qwen3.8-27b": {
+        "input": 0.10,
+        "output": 0.15,
     },
     # Fallback for unknown models — use a conservative estimate
     "_default": {

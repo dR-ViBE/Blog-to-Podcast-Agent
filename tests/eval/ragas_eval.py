@@ -303,7 +303,7 @@ def evaluate(retrieval_only: bool = False):
         from ragas.metrics import ContextPrecision, ContextRecall, ContextEntityRecall
         from ragas.run_config import RunConfig
 
-        judge_llm = ChatGroq(model="llama-3.1-8b-instant")
+        judge_llm = ChatGroq(model="openai/gpt-oss-20b")
         judge_embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
 
         # Build RAGAS dataset

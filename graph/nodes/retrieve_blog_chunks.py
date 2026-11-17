@@ -2,24 +2,31 @@
 graph/nodes/retrieve_blog_chunks.py
 
 PURPOSE:
-    LangGraph node for the Retriever Agent — now a TRUE tool-use agent.
-
-BEFORE (Pipeline):
-    Hardcoded sequence: retriever_chain → ChromaDB search → dedup → rerank.
-    The LLM generated sub-queries but the execution path was fixed in code.
+    LangGraph node for the Retriever Agent — a TRUE tool-use agent.
 
 AFTER (Tool-Use Agent):
     The LLM autonomously decides which tools to call and in what order:
       - search_vectorstore : search local ChromaDB (primary)
-      - search_web         : live Tavily web search (fallback)
+      - search_web         : live Tavily web search (supplemental, Editor-approved only)
 
-    The LLM observes what each tool returns and decides:
-      "The vector store has enough context on this topic." → stop.
-      "The vector store is thin on recent developments." → also call search_web.
-      "I need more specifics on concept X." → call search_vectorstore again with a narrower query.
+ARCHITECTURE CHANGE (Fix #3 — Route-After-Retrieval Gate):
+    BEFORE: Any empty initial retrieval silently set web_search_required=True,
+            offering the internet as a fallback regardless of why retrieval was empty.
 
-    This is the key difference from a pipeline: the LLM controls the flow,
-    not hardcoded Python edges.
+    AFTER:  Two distinct retrieval contexts:
+
+      1. INITIAL pass (context_gaps not set, generation_count == 0):
+         - web_search_approved is NOT given to the agent (vectorstore-only search)
+         - If final_docs is empty → set retrieval_failure_reason (fail-fast signal)
+         - web_search_required is NEVER set on the initial pass
+         - route_after_retrieval sees retrieval_failure_reason → routes to END
+           with a user-facing "no content" error (not a web search dialog)
+
+      2. SUPPLEMENTAL pass (context_gaps set by Editor's request_more_context):
+         - web_search is available if user previously approved it
+         - If final_docs is empty after supplemental search → web_search_required=True
+         - This is the ONLY path where the web search approval dialog appears
+         - Web search supplements the user's existing content, not replaces it
 
 HOW create_react_agent WORKS:
     LangGraph's create_react_agent implements the ReAct (Reason + Act) loop:
@@ -36,8 +43,10 @@ RERANKING (still applied after agent):
 """
 
 import json
+import logging
 from typing import Dict, List, Optional
 
+import chromadb
 from langchain_core.documents import Document
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
@@ -47,22 +56,42 @@ from sentence_transformers import CrossEncoder
 
 from graph.tools import search_vectorstore, search_web
 from graph.state import GraphState
+from graph.utils.node_metrics import NodeTimer
 
-# ─── Module-Level CrossEncoder Cache ────────────────────────────────────────
-# IMPORTANT: Do NOT instantiate CrossEncoder inside the retrieve_blog_chunks()
-# function. Doing so reloads the ~500MB model from disk on every pipeline run
-# (3-8 seconds of wasted overhead, and 3 copies in RAM for 3 concurrent users).
+logger = logging.getLogger(__name__)
+
+# ─── ChromaDB Client for user-doc count check ────────────────────────────────
+# Used to distinguish "user has zero documents" from "query is off-topic".
+# Same client as vectorstore_tool.py (PersistentClient is safe to share).
+_chroma_client_check = chromadb.PersistentClient(path="./.chroma")
+
+
+# ─── Lazy CrossEncoder Singleton ─────────────────────────────────────────────
+# WHY LAZY (not module-level):
+#   Loading at import time triggers a HuggingFace download during API startup
+#   which conflicts with the httpx async lifecycle and causes:
+#     RuntimeError: Cannot send a request, as the client has been closed.
 #
-# By instantiating at module level, the model is loaded ONCE when Python first
-# imports this file, then reused across all invocations. CrossEncoder.predict()
-# is stateless and thread-safe for inference.
-_CROSS_ENCODER = CrossEncoder("BAAI/bge-reranker-base")
+# WHY SINGLETON (not per-call):
+#   We still only want ONE model loaded in RAM. The getter caches after first
+#   call. CrossEncoder.predict() is stateless and thread-safe for inference.
+_CROSS_ENCODER: CrossEncoder = None
+
+
+def _get_cross_encoder() -> CrossEncoder:
+    """Return the cached CrossEncoder, loading it on first call."""
+    global _CROSS_ENCODER
+    if _CROSS_ENCODER is None:
+        logger.info("Loading CrossEncoder model BAAI/bge-reranker-base (first call)...")
+        _CROSS_ENCODER = CrossEncoder("BAAI/bge-reranker-base")
+        logger.info("CrossEncoder model loaded successfully.")
+    return _CROSS_ENCODER
 
 
 # ─── Retriever Agent Setup ────────────────────────────────────────────────────
 # The LLM is given both tools. Its docstrings tell it when to use each one.
-# llama-3.1-8b-instant supports tool calling via Groq's API.
-_retriever_llm = ChatGroq(model="llama-3.1-8b-instant", max_tokens=2500).with_fallbacks([ChatGroq(model="llama-3.3-70b-versatile", max_tokens=2500)])
+# openai/gpt-oss-20b supports tool calling via Groq's API.
+_retriever_llm = ChatGroq(model="openai/gpt-oss-20b", max_tokens=2500).with_fallbacks([ChatGroq(model="openai/gpt-oss-120b", max_tokens=2500)])
 _retriever_tools = [search_vectorstore, search_web]
 
 # create_react_agent returns a compiled LangGraph sub-graph.
@@ -198,11 +227,14 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
     # ── Invoke the ReAct agent ─────────────────────────────────────────────────
     # The agent will call tools autonomously until it decides it's done.
     # We set a strict recursion_limit to prevent infinite tool-calling loops that blow up context size and TPM rate limits.
-    agent_result = dynamic_agent.invoke(
-        {"messages": [("user", agent_input)]},
-        {"recursion_limit": 4}
-    )
+    # Phase 2 (#10): NodeTimer records retrieve latency to Prometheus.
+    with NodeTimer("retrieve"):
+        agent_result = dynamic_agent.invoke(
+            {"messages": [("user", agent_input)]},
+            {"recursion_limit": 4}
+        )
     all_messages = agent_result.get("messages", [])
+
 
     # ── Extract documents from tool call results ───────────────────────────────
     raw_docs = _extract_docs_from_agent_messages(all_messages)
@@ -224,7 +256,7 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
         final_docs = []
     else:
         pairs = [[query, doc.page_content] for doc in unique_docs]
-        scores = _CROSS_ENCODER.predict(pairs)
+        scores = _get_cross_encoder().predict(pairs)
         scored = sorted(zip(unique_docs, scores), key=lambda x: x[1], reverse=True)
 
         # Apply a strict relevance threshold to discard irrelevant documents
@@ -248,14 +280,70 @@ def retrieve_blog_chunks(state: GraphState, config: RunnableConfig = None) -> Di
         "context_gaps_addressed": bool(context_gaps),
     }
 
-    # If vector store results are empty and web search hasn't been approved yet,
-    # we flag that web search is required (HITL approval flow).
+    # ── Set retrieval outcome signals ──────────────────────────────────────────
+    #
+    # Two fundamentally different cases when final_docs is empty:
+    #
+    # Case A — INITIAL retrieval pass (context_gaps not set):
+    #   The user just submitted a query. We found nothing in their documents.
+    #   This should FAIL FAST with an informative message, NOT offer web search.
+    #   We set retrieval_failure_reason so route_after_retrieval can route to END.
+    #   We try to distinguish WHY nothing was found:
+    #     - "no_documents_ingested" : user has uploaded nothing at all for this user_id
+    #     - "no_matching_content"   : user has docs but query is off-topic / unrelated
+    #
+    # Case B — SUPPLEMENTAL retrieval pass (context_gaps set by Editor):
+    #   The Editor identified gaps in an existing script and sent retriever back.
+    #   Web search is legitimate here — it supplements existing user content.
+    #   We set web_search_required=True if no docs found, triggering HITL dialog.
+
     web_search_required = False
-    if not final_docs and not web_search_approved:
-        web_search_required = True
+    retrieval_failure_reason = None
+
+    if not final_docs:
+        if context_gaps:
+            # Case B: Supplemental pass — editor found context gaps.
+            # Web search is acceptable as a supplement to existing source material.
+            if not web_search_approved:
+                web_search_required = True
+                logger.info(
+                    "Supplemental retrieval empty | web_search_required=True | context_gaps=%r",
+                    context_gaps[:100] if context_gaps else "",
+                )
+        else:
+            # Case A: Initial retrieval pass — fail fast.
+            # Determine WHY there are no results so we can give a precise message.
+            try:
+                collection = _chroma_client_check.get_collection("blog_podcast_agent_v2")
+                # Count docs for this specific user_id
+                user_docs = collection.get(
+                    where={"user_id": {"$eq": state.get("user_id", "default_user")}},
+                    limit=1,
+                )
+                has_any_docs = bool(user_docs and user_docs.get("ids"))
+            except Exception as chroma_exc:
+                logger.debug("ChromaDB count check failed (non-critical): %s", chroma_exc)
+                has_any_docs = False  # assume no docs if check fails
+
+            if has_any_docs:
+                retrieval_failure_reason = "no_matching_content"
+                logger.info(
+                    "Initial retrieval empty — user has docs but query is off-topic | "
+                    "query=%r | user_id=%r",
+                    query,
+                    state.get("user_id", "default_user"),
+                )
+            else:
+                retrieval_failure_reason = "no_documents_ingested"
+                logger.info(
+                    "Initial retrieval empty — user has NO documents ingested | "
+                    "user_id=%r",
+                    state.get("user_id", "default_user"),
+                )
 
     return {
         "documents": final_docs,
         "retrieval_strategy": retrieval_strategy,
         "web_search_required": web_search_required,
+        "retrieval_failure_reason": retrieval_failure_reason,
     }

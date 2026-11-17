@@ -13,11 +13,13 @@
 #   - Source provenance: unique sources extracted from retrieved documents
 #   - Prompt version metadata in LangSmith traces
 
+import hashlib
 import logging
 import os
 import time
 from pathlib import Path
 from typing import List, Optional
+
 
 from langchain_core.runnables import RunnableConfig
 from langsmith import traceable
@@ -43,7 +45,7 @@ _APP_NAME = os.getenv("APP_NAME", "blog-to-podcast-agent")
 _APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
 _ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 _LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "podcast-agent")
-_LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
+_LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-oss-20b")
 
 
 @traceable(
@@ -139,6 +141,20 @@ def run_podcast_agent(
         web_search_approved,
     )
 
+    # ── Phase 2 (#6): Generate deterministic checkpoint thread_id ────────────
+    # The thread_id is a hash of the query + current time (truncated to minute).
+    # Same query submitted within the same minute gets the SAME thread_id,
+    # enabling deterministic replay: if the server crashes mid-run, resubmitting
+    # the same query within the same minute will resume from the checkpoint.
+    # Outside the same minute, a new thread_id is generated so it's a fresh run.
+    _time_bucket = str(int(time.time()) // 60)  # truncate to nearest minute
+    _thread_id_raw = f"{query}|{user_id}|{_time_bucket}"
+    checkpoint_thread_id = hashlib.sha256(_thread_id_raw.encode()).hexdigest()[:16]
+    # Also store in initial state so nodes can read it if needed
+    initial_state["checkpoint_thread_id"] = checkpoint_thread_id
+
+    logger.info("Checkpoint thread_id=%s | query=%r", checkpoint_thread_id, query)
+
     # ── Build RunnableConfig with rich LangSmith metadata ────────────────────
     # Include prompt versions so every LangSmith trace shows exactly which
     # prompt file was active for this run — critical for debugging regressions.
@@ -152,6 +168,9 @@ def run_podcast_agent(
             f"max_gen_{max_generations}",
         ],
         configurable={
+            # Phase 2 (#6): thread_id is the LangGraph checkpoint key.
+            # LangGraph uses this to store/retrieve node state snapshots.
+            "thread_id": checkpoint_thread_id,
             "user_id": user_id,
             "web_search_approved": web_search_approved,
         },
@@ -194,12 +213,68 @@ def run_podcast_agent(
     # ── Invoke the LangGraph app ──────────────────────────────────────────────
     try:
         final_state: dict = langgraph_app.invoke(initial_state, config=run_config)
-        
-        # Intercept approval check:
-        # If we need web search but the user hasn't approved it yet, return requires_approval status
+
+        # ── Intercept: No content found (initial retrieval failed) ───────────
+        # This check runs BEFORE the web_search_required check.
+        # retrieval_failure_reason is set when the INITIAL retrieval (not supplemental)
+        # finds no documents. We fail fast with a user-facing error — no web search dialog.
+        retrieval_failure_reason = final_state.get("retrieval_failure_reason")
+        if retrieval_failure_reason:
+            logger.info(
+                "Pipeline halted — no content found | reason=%r | query=%r | user_id=%r",
+                retrieval_failure_reason,
+                query,
+                user_id,
+            )
+            if mlflow_run:
+                try:
+                    mlflow.log_param("status", "no_content")
+                    mlflow.log_param("retrieval_failure_reason", retrieval_failure_reason)
+                    mlflow.end_run()
+                except Exception:
+                    pass
+            elapsed = time.monotonic() - start_time
+            METRICS.pipeline_duration_seconds.observe(elapsed)
+            METRICS.active_pipeline_runs.dec()
+            METRICS.requests_total.labels(status="no_content").inc()
+
+            # Craft a precise, actionable message based on the reason
+            if retrieval_failure_reason == "no_documents_ingested":
+                no_content_message = (
+                    "You haven't ingested any documents yet. "
+                    "Please upload a PDF, paste a URL, or provide a text file in the Ingest tab first, "
+                    "then come back and generate your podcast."
+                )
+            elif retrieval_failure_reason == "no_matching_content":
+                no_content_message = (
+                    "Your query doesn't match the content you've uploaded. "
+                    "The documents you've ingested don't appear to cover this topic. "
+                    "Please rephrase your query to match your uploaded content, "
+                    "or ingest new documents relevant to this topic."
+                )
+            else:
+                no_content_message = (
+                    "No relevant content was found in your uploaded documents for this query. "
+                    "Please check that you've ingested the right documents and that your query matches their content."
+                )
+
+            return PodcastResponse(
+                status="no_content",
+                message=no_content_message,
+                web_search_required=False,
+                script=None,
+                audio_path=None,
+                generation_count=0,
+                accepted=False,
+            )
+
+        # ── Intercept: Web search approval needed (supplemental search only) ──
+        # This only triggers when the Editor requested more context (request_more_context)
+        # and the supplemental retrieval found nothing in the vector store.
+        # Web search is offered as a SUPPLEMENT to existing content, not a replacement.
         web_search_required = final_state.get("web_search_required", False)
         if web_search_required and not web_search_approved:
-            logger.info("Pipeline paused | requires web search approval | query=%r", query)
+            logger.info("Pipeline paused | requires supplemental web search approval | query=%r", query)
             if mlflow_run:
                 try:
                     mlflow.log_param("status", "requires_approval")
@@ -210,10 +285,14 @@ def run_podcast_agent(
             elapsed = time.monotonic() - start_time
             METRICS.pipeline_duration_seconds.observe(elapsed)
             METRICS.active_pipeline_runs.dec()
-            
+
             return PodcastResponse(
                 status="requires_approval",
-                message="The uploaded document does not have information regarding your query or not enough info available in the source provided. Do you approve the system to crawl the internet and get you resources?",
+                message=(
+                    "Your uploaded content was used to generate an initial script, but the editor found "
+                    "it needs more specific details. Would you like the system to search the web for "
+                    "additional context to enrich the podcast? This will supplement — not replace — your uploaded content."
+                ),
                 web_search_required=True,
                 script=None,
                 audio_path=None,

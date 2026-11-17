@@ -51,6 +51,14 @@ EMBEDDING_MODEL = "nomic-embed-text"
 CHUNK_SIZE = 300  # tokens — same as the original ingestion.py
 CHUNK_OVERLAP = 50  # tokens — 50-token overlap preserves sentence boundaries
 
+import logging
+import chromadb as _chromadb
+
+_logger = logging.getLogger(__name__)
+
+# ChromaDB client for the dedup pre-flight check (shared, thread-safe)
+_chroma_dedup_client = _chromadb.PersistentClient(path=CHROMA_DIR)
+
 # File extensions recognised when scanning a directory
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".rst", ".pdf"}
 
@@ -84,7 +92,12 @@ def _load_from_url(url: str, user_id: str = "default_user") -> List[Document]:
 
     if isinstance(response, str):
         if not response.strip():
-            raise ValueError(f"Tavily returned an empty response for URL (possible rate limit or fetch failure): {url}")
+            raise ValueError(
+                f"The URL could not be crawled — Tavily returned an empty response. "
+                f"This usually means the page blocks automated crawlers, requires JavaScript to load, "
+                f"or is temporarily unavailable. Please try a different URL or upload the page as a PDF. "
+                f"(URL: {url})"
+            )
         try:
             response = json.loads(response)
         except json.JSONDecodeError:
@@ -110,6 +123,15 @@ def _load_from_url(url: str, user_id: str = "default_user") -> List[Document]:
                     "user_id": user_id,
                 },
             )
+        )
+
+    if not documents:
+        raise ValueError(
+            f"The URL was crawled successfully but no readable text content was found. "
+            f"This can happen with JavaScript-heavy pages, paywalled content, login-gated pages, "
+            f"or pages that only contain images and media. "
+            f"Please try a different URL or save the page as a PDF and upload it instead. "
+            f"(URL: {url})"
         )
 
     print(f"  [URL] Loaded {len(documents)} pages from crawl.")
@@ -232,8 +254,12 @@ def ingest_source(source: str, user_id: str = "default_user") -> int:
         )
 
     if not raw_docs:
-        print("  [WARNING] No content found in source. Nothing ingested.")
-        return 0
+        # This is a failure, not a silent success — raise so the route returns HTTP 422.
+        raise ValueError(
+            "No content could be extracted from the provided source. "
+            "If this is a URL, the page may block crawlers, require JavaScript, or be behind a paywall. "
+            "Try uploading the content as a PDF or plain-text file instead."
+        )
 
     # ── Chunk ─────────────────────────────────────────────────────────────────
     print(f"\n  Chunking {len(raw_docs)} document(s)...")
@@ -247,6 +273,42 @@ def ingest_source(source: str, user_id: str = "default_user") -> int:
     # ── Embed + Store in ChromaDB ─────────────────────────────────────────────
     print("\n  Embedding and storing in ChromaDB...")
     print(f"  Collection: '{CHROMA_COLLECTION}' | Directory: '{CHROMA_DIR}'")
+
+    # ── Deduplication pre-flight check ───────────────────────────────────────
+    # Before embedding (which is slow and expensive), check if ANY chunk for this
+    # source+user_id pair already exists in ChromaDB. If so, skip ingestion and
+    # return the existing chunk count. This fulfils the dedup promise in the docstring
+    # and prevents duplicate chunks from repeated ingestion calls.
+    #
+    # WHY NOT upsert: ChromaDB upsert requires stable chunk IDs. We use
+    # auto-generated IDs today. The source-level existence check is a simpler,
+    # fully correct guard for the common case (re-uploading same file/URL).
+    primary_source = raw_docs[0].metadata.get("source", source) if raw_docs else source
+    try:
+        _col = _chroma_dedup_client.get_or_create_collection(
+            CHROMA_COLLECTION,
+            metadata={"hnsw:space": "cosine"},
+        )
+        existing = _col.get(
+            where={"$and": [{"source": {"$eq": primary_source}}, {"user_id": {"$eq": user_id}}]},
+            limit=1,
+        )
+        if existing and existing.get("ids"):
+            existing_count = _col.count()  # approximate — exact per-source count not cheap
+            # Get accurate count for this source
+            all_for_source = _col.get(
+                where={"$and": [{"source": {"$eq": primary_source}}, {"user_id": {"$eq": user_id}}]},
+            )
+            source_chunk_count = len(all_for_source.get("ids", []))
+            _logger.info(
+                "Dedup: source '%s' already ingested for user '%s' (%d chunks). Skipping re-ingestion.",
+                primary_source, user_id, source_chunk_count,
+            )
+            print(f"  [DEDUP] Source already ingested ({source_chunk_count} chunks). Skipping.")
+            return source_chunk_count
+    except Exception as dedup_exc:
+        # Non-critical: if dedup check fails (e.g. collection not yet created), proceed normally
+        _logger.debug("Dedup pre-flight check failed (non-critical): %s", dedup_exc)
 
     vectorstore = Chroma(
         collection_name=CHROMA_COLLECTION,
